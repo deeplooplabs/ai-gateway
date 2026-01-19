@@ -76,6 +76,9 @@ func GeminiToOpenAI(resp *GenerateContentResponse, model string) *openai.ChatCom
 		// Extract text from parts
 		var content string
 		for _, part := range candidate.Content.Parts {
+			if content != "" && part.Text != "" {
+				content += " "
+			}
 			content += part.Text
 		}
 
