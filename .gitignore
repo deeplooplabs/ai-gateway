@@ -1,0 +1,12 @@
+.idea
+.vscode
+.env
+config.yaml
+*.out
+*.log
+
+protobuf
+
+node_modules
+
+*.exe
