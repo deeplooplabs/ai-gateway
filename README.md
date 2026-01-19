@@ -156,10 +156,6 @@ import (
 // HTTP-based Gemini provider
 geminiHTTP := provider.NewGeminiHTTPProvider("your-api-key")
 registry.Register("gemini-pro", geminiHTTP, "gemini-2.0-flash-exp")
-
-// SDK-based Gemini provider (requires cloud.google.com/go/ai)
-geminiSDK, _ := provider.NewGeminiSDKProvider("your-api-key", "gemini-2.0-flash-exp")
-registry.Register("gemini-flash", geminiSDK, "")
 ```
 
 ## License
