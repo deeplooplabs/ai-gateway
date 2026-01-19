@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -128,14 +129,56 @@ func (h *ChatHandler) handleStream(w http.ResponseWriter, r *http.Request, req *
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
 
-	// For mock/testing, send simple chunk
-	chunk := `data: {"id":"test-id","object":"chat.completion.chunk","created":1234567890,"model":"` + req.Model + `","choices":[{"index":0,"delta":{"content":"Hello!"},"finish_reason":null}]}` + "\n\n"
-	io.WriteString(w, chunk)
+	// Type assert to StreamingProvider
+	streamingProvider, ok := prov.(interface{ SendRequestStream(context.Context, string, *openai.ChatCompletionRequest) (<-chan openai.StreamChunk, <-chan error) })
+	if !ok {
+		h.writeError(w, r, NewValidationError("provider does not support streaming"))
+		return
+	}
 
-	endChunk := `data: [DONE]` + "\n\n"
-	io.WriteString(w, endChunk)
+	// Get streaming channels from provider
+	chunkChan, errChan := streamingProvider.SendRequestStream(r.Context(), "/v1/chat/completions", req)
 
-	flusher.Flush()
+	// Process chunks
+	for {
+		select {
+		case <-r.Context().Done():
+			return
+		case chunk, ok := <-chunkChan:
+			if !ok {
+				return
+			}
+			if chunk.Done {
+				// Send [DONE] marker
+				io.WriteString(w, "data: [DONE]\n\n")
+				flusher.Flush()
+				return
+			}
+			if len(chunk.Data) > 0 {
+				// Call streaming hooks
+				modifiedData := chunk.Data
+				for _, hh := range h.hooks.StreamingHooks() {
+					result, err := hh.OnChunk(r.Context(), modifiedData)
+					if err != nil {
+						h.writeError(w, r, fmt.Errorf("streaming hook error: %w", err))
+						return
+					}
+					modifiedData = result
+				}
+
+				// Write SSE formatted chunk
+				io.WriteString(w, "data: ")
+				io.WriteString(w, string(modifiedData))
+				io.WriteString(w, "\n\n")
+				flusher.Flush()
+			}
+		case err := <-errChan:
+			if err != nil {
+				h.writeError(w, r, NewProviderError("stream error", err))
+				return
+			}
+		}
+	}
 }
 
 func (h *ChatHandler) writeError(w http.ResponseWriter, r *http.Request, err error) {

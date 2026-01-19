@@ -32,7 +32,8 @@ type RequestHook interface {
 type StreamingHook interface {
 	Hook
 	// OnChunk is called for each SSE chunk in streaming responses
-	OnChunk(ctx context.Context, chunk []byte) error
+	// Returns the (potentially modified) chunk data
+	OnChunk(ctx context.Context, chunk []byte) ([]byte, error)
 }
 
 // ErrorHook is called when an error occurs
