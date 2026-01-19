@@ -105,3 +105,43 @@ func (m *mockProvider) SendRequestStream(ctx context.Context, endpoint string, r
 
 // Ensure mockProvider implements the interface
 var _ provider.Provider = (*mockProvider)(nil)
+
+func TestGateway_EmbeddingsEndpoint(t *testing.T) {
+	gw := New()
+
+	reqBody := map[string]any{
+		"input": "test",
+		"model": "text-embedding-3-small",
+	}
+	bodyBytes, _ := json.Marshal(reqBody)
+
+	req := httptest.NewRequest("POST", "/v1/embeddings", bytes.NewReader(bodyBytes))
+	req.Header.Set("Content-Type", "application/json")
+
+	w := httptest.NewRecorder()
+	gw.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK && w.Code != http.StatusNotFound {
+		t.Errorf("unexpected status: %d", w.Code)
+	}
+}
+
+func TestGateway_ImagesEndpoint(t *testing.T) {
+	gw := New()
+
+	reqBody := map[string]any{
+		"prompt": "a cat",
+		"model":  "dall-e-3",
+	}
+	bodyBytes, _ := json.Marshal(reqBody)
+
+	req := httptest.NewRequest("POST", "/v1/images/generations", bytes.NewReader(bodyBytes))
+	req.Header.Set("Content-Type", "application/json")
+
+	w := httptest.NewRecorder()
+	gw.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK && w.Code != http.StatusNotFound {
+		t.Errorf("unexpected status: %d", w.Code)
+	}
+}
