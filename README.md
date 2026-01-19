@@ -133,6 +133,35 @@ func (h *LoggingHook) OnChunk(ctx context.Context, chunk []byte) ([]byte, error)
 }
 ```
 
+## Providers
+
+### OpenAI Provider
+
+```go
+import (
+    "github.com/deeplooplabs/ai-gateway/provider"
+)
+
+openAI := provider.NewHTTPProvider("https://api.openai.com", "your-api-key")
+registry.Register("gpt-4", openAI, "")
+```
+
+### Gemini Provider
+
+```go
+import (
+    "github.com/deeplooplabs/ai-gateway/provider"
+)
+
+// HTTP-based Gemini provider
+geminiHTTP := provider.NewGeminiHTTPProvider("your-api-key")
+registry.Register("gemini-pro", geminiHTTP, "gemini-2.0-flash-exp")
+
+// SDK-based Gemini provider (requires cloud.google.com/go/ai)
+geminiSDK, _ := provider.NewGeminiSDKProvider("your-api-key", "gemini-2.0-flash-exp")
+registry.Register("gemini-flash", geminiSDK, "")
+```
+
 ## License
 
 MIT
