@@ -28,27 +28,45 @@ func NewChatHandler(registry model.ModelRegistry, hooks *hook.Registry) *ChatHan
 
 // ServeHTTP implements http.Handler
 func (h *ChatHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	// Ensure request body is closed
+	defer r.Body.Close()
+
+	// Call AuthenticationHooks to validate Authorization header
+	for _, hh := range h.hooks.AuthenticationHooks() {
+		success, userID, err := hh.Authenticate(r.Context(), r.Header.Get("Authorization"))
+		if err != nil {
+			h.writeError(w, r, fmt.Errorf("authentication failed: %w", err))
+			return
+		}
+		if !success {
+			h.writeError(w, r, NewValidationError("authentication failed"))
+			return
+		}
+		// Store userID in request context for downstream use
+		_ = userID // TODO: integrate userID into request context
+	}
+
 	// Parse request
 	var req openai.ChatCompletionRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		h.writeError(w, NewValidationError("invalid request body: "+err.Error()))
+		h.writeError(w, r, NewValidationError("invalid request body: "+err.Error()))
 		return
 	}
 
 	// Validate request
 	if req.Model == "" {
-		h.writeError(w, NewValidationError("model is required"))
+		h.writeError(w, r, NewValidationError("model is required"))
 		return
 	}
 	if len(req.Messages) == 0 {
-		h.writeError(w, NewValidationError("messages is required"))
+		h.writeError(w, r, NewValidationError("messages is required"))
 		return
 	}
 
 	// Resolve provider
 	prov, modelRewrite := h.registry.Resolve(req.Model)
 	if prov == nil {
-		h.writeError(w, NewNotFoundError("model not found: "+req.Model))
+		h.writeError(w, r, NewNotFoundError("model not found: "+req.Model))
 		return
 	}
 
@@ -71,7 +89,7 @@ func (h *ChatHandler) handleNonStream(w http.ResponseWriter, r *http.Request, re
 	// Call BeforeRequest hooks
 	for _, hh := range h.hooks.RequestHooks() {
 		if err := hh.BeforeRequest(r.Context(), req); err != nil {
-			h.writeError(w, fmt.Errorf("hook error: %w", err))
+			h.writeError(w, r, fmt.Errorf("hook error: %w", err))
 			return
 		}
 	}
@@ -79,27 +97,30 @@ func (h *ChatHandler) handleNonStream(w http.ResponseWriter, r *http.Request, re
 	// Send request to provider
 	resp, err := prov.SendRequest(r.Context(), "/v1/chat/completions", req)
 	if err != nil {
-		h.writeError(w, NewProviderError("provider error", err))
+		h.writeError(w, r, NewProviderError("provider error", err))
 		return
 	}
 
 	// Call AfterRequest hooks
 	for _, hh := range h.hooks.RequestHooks() {
 		if err := hh.AfterRequest(r.Context(), req, resp); err != nil {
-			h.writeError(w, fmt.Errorf("hook error: %w", err))
+			h.writeError(w, r, fmt.Errorf("hook error: %w", err))
 			return
 		}
 	}
 
 	// Write response
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(resp)
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		h.writeError(w, r, NewProviderError("failed to encode response", err))
+		return
+	}
 }
 
 func (h *ChatHandler) handleStream(w http.ResponseWriter, r *http.Request, req *openai.ChatCompletionRequest, prov provider.Provider) {
 	flusher, ok := w.(http.Flusher)
 	if !ok {
-		h.writeError(w, NewValidationError("streaming not supported"))
+		h.writeError(w, r, NewValidationError("streaming not supported"))
 		return
 	}
 
@@ -117,7 +138,7 @@ func (h *ChatHandler) handleStream(w http.ResponseWriter, r *http.Request, req *
 	flusher.Flush()
 }
 
-func (h *ChatHandler) writeError(w http.ResponseWriter, err error) {
+func (h *ChatHandler) writeError(w http.ResponseWriter, r *http.Request, err error) {
 	var gwErr *GatewayError
 	if e, ok := err.(*GatewayError); ok {
 		gwErr = e
@@ -125,9 +146,17 @@ func (h *ChatHandler) writeError(w http.ResponseWriter, err error) {
 		gwErr = NewProviderError("internal error", err)
 	}
 
+	// Call ErrorHooks to notify of the error
+	ctx := r.Context()
+	for _, hh := range h.hooks.ErrorHooks() {
+		hh.OnError(ctx, err)
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(gwErr.Code)
-	json.NewEncoder(w).Encode(gwErr.ToOpenAIResponse())
+	if encodeErr := json.NewEncoder(w).Encode(gwErr.ToOpenAIResponse()); encodeErr != nil {
+		fmt.Printf("failed to encode error response: %v\n", encodeErr)
+	}
 }
 
 // GatewayError represents a gateway error (simplified for handler)
