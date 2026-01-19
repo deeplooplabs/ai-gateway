@@ -173,3 +173,67 @@ func TestDelta_EmptyFieldsOmitted(t *testing.T) {
 		t.Error("expected 'content' to be omitted when empty")
 	}
 }
+
+func TestEmbeddingRequest_UnmarshalJSON(t *testing.T) {
+	body := `{
+		"input": "hello world",
+		"model": "text-embedding-3-small",
+		"encoding_format": "float"
+	}`
+
+	var req EmbeddingRequest
+	if err := json.Unmarshal([]byte(body), &req); err != nil {
+		t.Fatalf("failed to unmarshal: %v", err)
+	}
+
+	if req.Model != "text-embedding-3-small" {
+		t.Errorf("expected 'text-embedding-3-small', got '%s'", req.Model)
+	}
+	if req.Input.(string) != "hello world" {
+		t.Error("input should be 'hello world'")
+	}
+}
+
+func TestImageRequest_UnmarshalJSON(t *testing.T) {
+	body := `{
+		"model": "dall-e-3",
+		"prompt": "a cat",
+		"n": 2,
+		"size": "1024x1024"
+	}`
+
+	var req ImageRequest
+	if err := json.Unmarshal([]byte(body), &req); err != nil {
+		t.Fatalf("failed to unmarshal: %v", err)
+	}
+
+	if req.Model != "dall-e-3" {
+		t.Errorf("expected 'dall-e-3', got '%s'", req.Model)
+	}
+	if req.N != 2 {
+		t.Errorf("expected n=2, got %d", req.N)
+	}
+}
+
+func TestImageResponse_MarshalJSON(t *testing.T) {
+	resp := &ImageResponse{
+		Created: 1234567890,
+		Data: []Image{{
+			URL: "https://example.com/image.png",
+		}},
+	}
+
+	data, err := json.Marshal(resp)
+	if err != nil {
+		t.Fatalf("failed to marshal: %v", err)
+	}
+
+	var decoded map[string]any
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		t.Fatalf("failed to decode: %v", err)
+	}
+
+	if decoded["created"].(float64) != 1234567890 {
+		t.Error("created timestamp mismatch")
+	}
+}

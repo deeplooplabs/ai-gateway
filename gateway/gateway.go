@@ -40,6 +40,14 @@ func (g *Gateway) setupRoutes() {
 	chatHandler := handler.NewChatHandler(g.modelRegistry, g.hooks)
 	g.mux.HandleFunc("/v1/chat/completions", chatHandler.ServeHTTP)
 
+	// Embeddings
+	embeddingsHandler := handler.NewEmbeddingsHandler(g.modelRegistry, g.hooks)
+	g.mux.HandleFunc("/v1/embeddings", embeddingsHandler.ServeHTTP)
+
+	// Images
+	imagesHandler := handler.NewImagesHandler(g.modelRegistry, g.hooks)
+	g.mux.HandleFunc("/v1/images/generations", imagesHandler.ServeHTTP)
+
 	// Health check
 	g.mux.HandleFunc("/health", g.handleHealth)
 

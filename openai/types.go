@@ -59,3 +59,49 @@ type ChatCompletionStreamResponse struct {
 	Model   string  `json:"model"`
 	Choices []Choice `json:"choices"`
 }
+
+// EmbeddingRequest represents an embedding request
+type EmbeddingRequest struct {
+	Input          any    `json:"input"`                       // string, []string, or [][]string
+	Model          string `json:"model"`
+	EncodingFormat string `json:"encoding_format,omitempty"` // "float" or "base64"
+	Dimensions     int    `json:"dimensions,omitempty"`       // embedding dimensions
+}
+
+// EmbeddingResponse represents an embedding response
+type EmbeddingResponse struct {
+	Object string      `json:"object"`
+	Data   []Embedding `json:"data"`
+	Model  string      `json:"model"`
+	Usage  Usage       `json:"usage"`
+}
+
+// Embedding represents a single embedding vector
+type Embedding struct {
+	Object    string    `json:"object"`
+	Embedding []float32 `json:"embedding"`
+	Index     int       `json:"index"`
+}
+
+// ImageRequest represents an image generation request
+type ImageRequest struct {
+	Model   string `json:"model,omitempty"`
+	Prompt  string `json:"prompt"`
+	N       int    `json:"n,omitempty"`
+	Size    string `json:"size,omitempty"`    // "256x256", "512x512", "1024x1024", "1792x1024", "1024x1792"
+	Quality string `json:"quality,omitempty"` // "standard" or "hd"
+	Style   string `json:"style,omitempty"`   // "vivid" or "natural"
+}
+
+// ImageResponse represents an image generation response
+type ImageResponse struct {
+	Created int64   `json:"created"`
+	Data    []Image `json:"data"`
+}
+
+// Image represents a generated image
+type Image struct {
+	URL           string `json:"url,omitempty"`           // For DALL-E 2
+	B64JSON       string `json:"b64_json,omitempty"`      // For DALL-E 3
+	RevisedPrompt string `json:"revised_prompt,omitempty"`
+}

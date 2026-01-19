@@ -123,3 +123,22 @@ func (m *mockChatProvider) SendRequest(ctx context.Context, endpoint string, req
 		},
 	}, nil
 }
+
+func (m *mockChatProvider) SendRequestStream(ctx context.Context, endpoint string, req *openai.ChatCompletionRequest) (<-chan openai.StreamChunk, <-chan error) {
+	chunkChan := make(chan openai.StreamChunk, 2)
+	errChan := make(chan error, 1)
+
+	go func() {
+		defer close(chunkChan)
+		defer close(errChan)
+
+		// Send a mock chunk
+		chunkData := `{"id":"test-id","object":"chat.completion.chunk","created":1234567890,"model":"` + req.Model + `","choices":[{"index":0,"delta":{"content":"Hello!"},"finish_reason":null}]}`
+		chunkChan <- openai.StreamChunk{Data: []byte(chunkData)}
+
+		// Send done marker
+		chunkChan <- openai.StreamChunk{Done: true}
+	}()
+
+	return chunkChan, errChan
+}

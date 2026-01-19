@@ -58,3 +58,32 @@ func (m *mockProvider) Name() string {
 func (m *mockProvider) SendRequest(ctx context.Context, endpoint string, req *openai.ChatCompletionRequest) (*openai.ChatCompletionResponse, error) {
 	return nil, nil
 }
+
+func (m *mockProvider) SendRequestStream(ctx context.Context, endpoint string, req *openai.ChatCompletionRequest) (<-chan openai.StreamChunk, <-chan error) {
+	chunkChan := make(chan openai.StreamChunk)
+	errChan := make(chan error, 1)
+	go func() {
+		defer close(chunkChan)
+		defer close(errChan)
+	}()
+	return chunkChan, errChan
+}
+
+func TestMapModelRegistry_GeminiProvider(t *testing.T) {
+	registry := NewMapModelRegistry()
+
+	mockProvider := &mockProvider{name: "test-gemini"}
+	registry.Register("gemini-pro", mockProvider, "gemini-2.0-flash-exp")
+
+	prov, rewrite := registry.Resolve("gemini-pro")
+
+	if prov == nil {
+		t.Fatal("expected non-nil provider")
+	}
+	if prov.Name() != "test-gemini" {
+		t.Errorf("expected provider name 'test-gemini', got '%s'", prov.Name())
+	}
+	if rewrite != "gemini-2.0-flash-exp" {
+		t.Errorf("expected rewrite 'gemini-2.0-flash-exp', got '%s'", rewrite)
+	}
+}

@@ -12,4 +12,6 @@ type Provider interface {
 	Name() string
 	// SendRequest sends a non-streaming request and returns the response
 	SendRequest(ctx context.Context, endpoint string, req *openai.ChatCompletionRequest) (*openai.ChatCompletionResponse, error)
+	// SendRequestStream sends a streaming request and returns channels for chunks and errors
+	SendRequestStream(ctx context.Context, endpoint string, req *openai.ChatCompletionRequest) (<-chan openai.StreamChunk, <-chan error)
 }

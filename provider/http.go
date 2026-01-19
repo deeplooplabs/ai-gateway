@@ -1,6 +1,7 @@
 package provider
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -68,4 +69,76 @@ func (p *HTTPProvider) SendRequest(ctx context.Context, endpoint string, req *op
 	}
 
 	return &chatResp, nil
+}
+
+// SendRequestStream sends a streaming request via HTTP
+func (p *HTTPProvider) SendRequestStream(ctx context.Context, endpoint string, req *openai.ChatCompletionRequest) (<-chan openai.StreamChunk, <-chan error) {
+	chunkChan := make(chan openai.StreamChunk, 16)
+	errChan := make(chan error, 1)
+
+	go func() {
+		defer close(chunkChan)
+		defer close(errChan)
+
+		// Marshal request
+		body, err := json.Marshal(req)
+		if err != nil {
+			errChan <- fmt.Errorf("marshal request: %w", err)
+			return
+		}
+
+		// Create HTTP request
+		url := p.BaseURL + endpoint
+		httpReq, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(body))
+		if err != nil {
+			errChan <- fmt.Errorf("create request: %w", err)
+			return
+		}
+
+		httpReq.Header.Set("Content-Type", "application/json")
+		httpReq.Header.Set("Authorization", "Bearer "+p.APIKey)
+		httpReq.Header.Set("Accept", "text/event-stream")
+
+		// Send request
+		resp, err := p.Client.Do(httpReq)
+		if err != nil {
+			errChan <- fmt.Errorf("send request: %w", err)
+			return
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			respBody, _ := io.ReadAll(resp.Body)
+			errChan <- fmt.Errorf("unexpected status %d: %s", resp.StatusCode, string(respBody))
+			return
+		}
+
+		// Read SSE line by line
+		scanner := bufio.NewScanner(resp.Body)
+		for scanner.Scan() {
+			line := scanner.Bytes()
+
+			// Check for [DONE]
+			if openai.IsDoneMarker(line) {
+				chunkChan <- openai.StreamChunk{Done: true}
+				return
+			}
+
+			// Extract data: content
+			_, data, isDone := openai.ParseSSELine(line)
+			if isDone {
+				chunkChan <- openai.StreamChunk{Done: true}
+				return
+			}
+			if data != "" {
+				chunkChan <- openai.StreamChunk{Data: []byte(data)}
+			}
+		}
+
+		if err := scanner.Err(); err != nil {
+			errChan <- fmt.Errorf("read stream: %w", err)
+		}
+	}()
+
+	return chunkChan, errChan
 }
