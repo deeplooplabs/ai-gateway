@@ -55,15 +55,20 @@ func (h *ImagesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		Resolve(model string) (any, string)
 	}
 	if reg, ok := h.registry.(resolver); ok {
-		provider, _ := reg.Resolve(req.Model)
+		provider, modelRewrite := reg.Resolve(req.Model)
 		if provider == nil {
 			h.writeError(w, r, NewNotFoundError("model not found: "+req.Model))
 			return
 		}
+		// Apply model rewrite if specified
+		if modelRewrite != "" {
+			req.Model = modelRewrite
+		}
 	}
 
-	// For mock/testing, return mock response
-	// In real implementation, this would call provider.SendRequest
+	// TODO: This is a mock response for testing purposes.
+	// Once the Images provider interface is added, replace this with actual provider.SendRequest call.
+	// The provider interface should handle image generation requests and return real image data.
 	resp := &openai.ImageResponse{
 		Created: 1234567890,
 		Data: []openai.Image{{
@@ -89,8 +94,10 @@ func (h *ImagesHandler) writeError(w http.ResponseWriter, r *http.Request, err e
 
 	// Call ErrorHooks to notify of the error
 	ctx := r.Context()
-	for _, hh := range h.hooks.ErrorHooks() {
-		hh.OnError(ctx, err)
+	if h.hooks != nil {
+		for _, hh := range h.hooks.ErrorHooks() {
+			hh.OnError(ctx, err)
+		}
 	}
 
 	w.Header().Set("Content-Type", "application/json")
