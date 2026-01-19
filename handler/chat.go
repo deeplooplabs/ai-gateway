@@ -9,14 +9,14 @@ import (
 
 	"github.com/deeplooplabs/ai-gateway/hook"
 	"github.com/deeplooplabs/ai-gateway/model"
-	"github.com/deeplooplabs/ai-gateway/openai"
 	"github.com/deeplooplabs/ai-gateway/provider"
+	openai2 "github.com/deeplooplabs/ai-gateway/provider/openai"
 )
 
 // StreamingProvider is the provider interface for streaming requests
 type StreamingProvider interface {
 	provider.Provider
-	SendRequestStream(ctx context.Context, endpoint string, req *openai.ChatCompletionRequest) (<-chan openai.StreamChunk, <-chan error)
+	SendRequestStream(ctx context.Context, endpoint string, req *openai2.ChatCompletionRequest) (<-chan openai2.StreamChunk, <-chan error)
 }
 
 // ChatHandler handles chat completion requests
@@ -57,7 +57,7 @@ func (h *ChatHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Parse request
-	var req openai.ChatCompletionRequest
+	var req openai2.ChatCompletionRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		h.writeError(w, r, NewValidationError("invalid request body: "+err.Error()))
 		return
@@ -95,7 +95,7 @@ func (h *ChatHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	h.handleNonStream(w, r, &req, prov)
 }
 
-func (h *ChatHandler) handleNonStream(w http.ResponseWriter, r *http.Request, req *openai.ChatCompletionRequest, prov provider.Provider) {
+func (h *ChatHandler) handleNonStream(w http.ResponseWriter, r *http.Request, req *openai2.ChatCompletionRequest, prov provider.Provider) {
 	// Call BeforeRequest hooks
 	for _, hh := range h.hooks.RequestHooks() {
 		if err := hh.BeforeRequest(r.Context(), req); err != nil {
@@ -127,7 +127,7 @@ func (h *ChatHandler) handleNonStream(w http.ResponseWriter, r *http.Request, re
 	}
 }
 
-func (h *ChatHandler) handleStream(w http.ResponseWriter, r *http.Request, req *openai.ChatCompletionRequest, prov provider.Provider) {
+func (h *ChatHandler) handleStream(w http.ResponseWriter, r *http.Request, req *openai2.ChatCompletionRequest, prov provider.Provider) {
 	flusher, ok := w.(http.Flusher)
 	if !ok {
 		h.writeError(w, r, NewValidationError("streaming not supported"))

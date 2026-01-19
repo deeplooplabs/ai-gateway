@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/deeplooplabs/ai-gateway/openai"
+	"github.com/deeplooplabs/ai-gateway/provider/openai"
 )
 
 // mockHook implements Hook interface for testing

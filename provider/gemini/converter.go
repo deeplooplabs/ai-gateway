@@ -1,7 +1,7 @@
 package gemini
 
 import (
-	"github.com/deeplooplabs/ai-gateway/openai"
+	"github.com/deeplooplabs/ai-gateway/provider/openai"
 )
 
 // OpenAIToGemini converts an OpenAI request to Gemini format

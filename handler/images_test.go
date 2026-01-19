@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/deeplooplabs/ai-gateway/hook"
-	"github.com/deeplooplabs/ai-gateway/openai"
+	"github.com/deeplooplabs/ai-gateway/provider/openai"
 )
 
 func TestImagesHandler_ServeHTTP(t *testing.T) {

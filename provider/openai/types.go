@@ -53,19 +53,19 @@ type ChatCompletionResponse struct {
 
 // ChatCompletionStreamResponse represents a streaming chunk
 type ChatCompletionStreamResponse struct {
-	ID      string  `json:"id"`
-	Object  string  `json:"object"`
-	Created int64   `json:"created"`
-	Model   string  `json:"model"`
+	ID      string   `json:"id"`
+	Object  string   `json:"object"`
+	Created int64    `json:"created"`
+	Model   string   `json:"model"`
 	Choices []Choice `json:"choices"`
 }
 
 // EmbeddingRequest represents an embedding request
 type EmbeddingRequest struct {
-	Input          any    `json:"input"`                       // string, []string, or [][]string
+	Input          any    `json:"input"` // string, []string, or [][]string
 	Model          string `json:"model"`
 	EncodingFormat string `json:"encoding_format,omitempty"` // "float" or "base64"
-	Dimensions     int    `json:"dimensions,omitempty"`       // embedding dimensions
+	Dimensions     int    `json:"dimensions,omitempty"`      // embedding dimensions
 }
 
 // EmbeddingResponse represents an embedding response
@@ -101,7 +101,7 @@ type ImageResponse struct {
 
 // Image represents a generated image
 type Image struct {
-	URL           string `json:"url,omitempty"`           // For DALL-E 2
-	B64JSON       string `json:"b64_json,omitempty"`      // For DALL-E 3
+	URL           string `json:"url,omitempty"`      // For DALL-E 2
+	B64JSON       string `json:"b64_json,omitempty"` // For DALL-E 3
 	RevisedPrompt string `json:"revised_prompt,omitempty"`
 }

@@ -49,16 +49,16 @@ type GenerationConfig struct {
 
 // GenerateContentResponse represents a Gemini generate content response
 type GenerateContentResponse struct {
-	Candidates   []Candidate   `json:"candidates"`
+	Candidates    []Candidate   `json:"candidates"`
 	UsageMetadata UsageMetadata `json:"usageMetadata"`
-	ModelVersion string        `json:"modelVersion,omitempty"`
+	ModelVersion  string        `json:"modelVersion,omitempty"`
 }
 
 // Candidate represents a response candidate
 type Candidate struct {
-	Content       Content       `json:"content"`
-	FinishReason  string        `json:"finishReason"`
-	Index         int           `json:"index"`
+	Content       Content        `json:"content"`
+	FinishReason  string         `json:"finishReason"`
+	Index         int            `json:"index"`
 	SafetyRatings []SafetyRating `json:"safetyRatings,omitempty"`
 }
 

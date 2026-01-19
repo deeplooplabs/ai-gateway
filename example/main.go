@@ -12,8 +12,8 @@ import (
 	"github.com/deeplooplabs/ai-gateway/gateway"
 	"github.com/deeplooplabs/ai-gateway/hook"
 	"github.com/deeplooplabs/ai-gateway/model"
-	"github.com/deeplooplabs/ai-gateway/openai"
 	"github.com/deeplooplabs/ai-gateway/provider"
+	"github.com/deeplooplabs/ai-gateway/provider/openai"
 )
 
 func main() {

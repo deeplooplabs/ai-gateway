@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/deeplooplabs/ai-gateway/openai"
+	openai2 "github.com/deeplooplabs/ai-gateway/provider/openai"
 )
 
 func TestProviderInterface(t *testing.T) {
@@ -17,9 +17,9 @@ func TestProviderInterface(t *testing.T) {
 		t.Errorf("expected 'mock', got '%s'", p.Name())
 	}
 
-	req := &openai.ChatCompletionRequest{
+	req := &openai2.ChatCompletionRequest{
 		Model:    "gpt-4",
-		Messages: []openai.Message{{Role: "user", Content: "test"}},
+		Messages: []openai2.Message{{Role: "user", Content: "test"}},
 	}
 
 	resp, err := p.SendRequest(context.Background(), "/v1/chat/completions", req)
@@ -39,14 +39,14 @@ func (m *mockProvider) Name() string {
 	return "mock"
 }
 
-func (m *mockProvider) SendRequest(ctx context.Context, endpoint string, req *openai.ChatCompletionRequest) (*openai.ChatCompletionResponse, error) {
-	return &openai.ChatCompletionResponse{
+func (m *mockProvider) SendRequest(ctx context.Context, endpoint string, req *openai2.ChatCompletionRequest) (*openai2.ChatCompletionResponse, error) {
+	return &openai2.ChatCompletionResponse{
 		ID:     "test-id",
 		Object: "chat.completion",
 		Model:  req.Model,
-		Choices: []openai.Choice{{
+		Choices: []openai2.Choice{{
 			Index: 0,
-			Message: openai.Message{
+			Message: openai2.Message{
 				Role:    "assistant",
 				Content: "test response",
 			},
@@ -55,14 +55,14 @@ func (m *mockProvider) SendRequest(ctx context.Context, endpoint string, req *op
 	}, nil
 }
 
-func (m *mockProvider) SendRequestStream(ctx context.Context, endpoint string, req *openai.ChatCompletionRequest) (<-chan openai.StreamChunk, <-chan error) {
-	chunkChan := make(chan openai.StreamChunk, 1)
+func (m *mockProvider) SendRequestStream(ctx context.Context, endpoint string, req *openai2.ChatCompletionRequest) (<-chan openai2.StreamChunk, <-chan error) {
+	chunkChan := make(chan openai2.StreamChunk, 1)
 	errChan := make(chan error, 1)
 
 	go func() {
 		defer close(chunkChan)
 		defer close(errChan)
-		chunkChan <- openai.StreamChunk{Done: true}
+		chunkChan <- openai2.StreamChunk{Done: true}
 	}()
 
 	return chunkChan, errChan
@@ -85,9 +85,9 @@ func TestProviderStreamingInterface(t *testing.T) {
 	var p Provider = &mockStreamProvider{}
 
 	// Non-streaming should work
-	req := &openai.ChatCompletionRequest{
+	req := &openai2.ChatCompletionRequest{
 		Model:    "gpt-4",
-		Messages: []openai.Message{{Role: "user", Content: "test"}},
+		Messages: []openai2.Message{{Role: "user", Content: "test"}},
 	}
 	resp, err := p.SendRequest(context.Background(), "/v1/chat/completions", req)
 	if err != nil {
@@ -125,14 +125,14 @@ func (m *mockStreamProvider) Name() string {
 	return "mock-stream"
 }
 
-func (m *mockStreamProvider) SendRequest(ctx context.Context, endpoint string, req *openai.ChatCompletionRequest) (*openai.ChatCompletionResponse, error) {
-	return &openai.ChatCompletionResponse{
+func (m *mockStreamProvider) SendRequest(ctx context.Context, endpoint string, req *openai2.ChatCompletionRequest) (*openai2.ChatCompletionResponse, error) {
+	return &openai2.ChatCompletionResponse{
 		ID:     "test-id",
 		Object: "chat.completion",
 		Model:  req.Model,
-		Choices: []openai.Choice{{
+		Choices: []openai2.Choice{{
 			Index: 0,
-			Message: openai.Message{
+			Message: openai2.Message{
 				Role:    "assistant",
 				Content: "test response",
 			},
@@ -141,8 +141,8 @@ func (m *mockStreamProvider) SendRequest(ctx context.Context, endpoint string, r
 	}, nil
 }
 
-func (m *mockStreamProvider) SendRequestStream(ctx context.Context, endpoint string, req *openai.ChatCompletionRequest) (<-chan openai.StreamChunk, <-chan error) {
-	chunkChan := make(chan openai.StreamChunk, 2)
+func (m *mockStreamProvider) SendRequestStream(ctx context.Context, endpoint string, req *openai2.ChatCompletionRequest) (<-chan openai2.StreamChunk, <-chan error) {
+	chunkChan := make(chan openai2.StreamChunk, 2)
 	errChan := make(chan error, 1)
 
 	go func() {
@@ -150,9 +150,9 @@ func (m *mockStreamProvider) SendRequestStream(ctx context.Context, endpoint str
 		defer close(errChan)
 
 		// Send test chunks
-		chunkChan <- openai.StreamChunk{Data: []byte(`{"id":"test","choices":[{"delta":{"content":"Hello"}}]}`)}
-		chunkChan <- openai.StreamChunk{Data: []byte(`{"id":"test","choices":[{"delta":{"content":" world"}}]}`)}
-		chunkChan <- openai.StreamChunk{Done: true}
+		chunkChan <- openai2.StreamChunk{Data: []byte(`{"id":"test","choices":[{"delta":{"content":"Hello"}}]}`)}
+		chunkChan <- openai2.StreamChunk{Data: []byte(`{"id":"test","choices":[{"delta":{"content":" world"}}]}`)}
+		chunkChan <- openai2.StreamChunk{Done: true}
 	}()
 
 	return chunkChan, errChan

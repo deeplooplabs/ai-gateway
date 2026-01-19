@@ -10,7 +10,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/deeplooplabs/ai-gateway/openai"
+	openai2 "github.com/deeplooplabs/ai-gateway/provider/openai"
 )
 
 // HTTPProvider sends requests via HTTP
@@ -37,7 +37,7 @@ func (p *HTTPProvider) Name() string {
 }
 
 // SendRequest sends a request via HTTP
-func (p *HTTPProvider) SendRequest(ctx context.Context, endpoint string, req *openai.ChatCompletionRequest) (*openai.ChatCompletionResponse, error) {
+func (p *HTTPProvider) SendRequest(ctx context.Context, endpoint string, req *openai2.ChatCompletionRequest) (*openai2.ChatCompletionResponse, error) {
 	body, err := json.Marshal(req)
 	if err != nil {
 		return nil, fmt.Errorf("marshal request: %w", err)
@@ -63,7 +63,7 @@ func (p *HTTPProvider) SendRequest(ctx context.Context, endpoint string, req *op
 		return nil, fmt.Errorf("unexpected status %d: %s", resp.StatusCode, string(respBody))
 	}
 
-	var chatResp openai.ChatCompletionResponse
+	var chatResp openai2.ChatCompletionResponse
 	if err := json.NewDecoder(resp.Body).Decode(&chatResp); err != nil {
 		return nil, fmt.Errorf("decode response: %w", err)
 	}
@@ -72,8 +72,8 @@ func (p *HTTPProvider) SendRequest(ctx context.Context, endpoint string, req *op
 }
 
 // SendRequestStream sends a streaming request via HTTP
-func (p *HTTPProvider) SendRequestStream(ctx context.Context, endpoint string, req *openai.ChatCompletionRequest) (<-chan openai.StreamChunk, <-chan error) {
-	chunkChan := make(chan openai.StreamChunk, 16)
+func (p *HTTPProvider) SendRequestStream(ctx context.Context, endpoint string, req *openai2.ChatCompletionRequest) (<-chan openai2.StreamChunk, <-chan error) {
+	chunkChan := make(chan openai2.StreamChunk, 16)
 	errChan := make(chan error, 1)
 
 	go func() {
@@ -119,19 +119,19 @@ func (p *HTTPProvider) SendRequestStream(ctx context.Context, endpoint string, r
 			line := scanner.Bytes()
 
 			// Check for [DONE]
-			if openai.IsDoneMarker(line) {
-				chunkChan <- openai.StreamChunk{Done: true}
+			if openai2.IsDoneMarker(line) {
+				chunkChan <- openai2.StreamChunk{Done: true}
 				return
 			}
 
 			// Extract data: content
-			_, data, isDone := openai.ParseSSELine(line)
+			_, data, isDone := openai2.ParseSSELine(line)
 			if isDone {
-				chunkChan <- openai.StreamChunk{Done: true}
+				chunkChan <- openai2.StreamChunk{Done: true}
 				return
 			}
 			if data != "" {
-				chunkChan <- openai.StreamChunk{Data: []byte(data)}
+				chunkChan <- openai2.StreamChunk{Data: []byte(data)}
 			}
 		}
 

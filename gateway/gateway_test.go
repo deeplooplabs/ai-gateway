@@ -10,8 +10,8 @@ import (
 
 	"github.com/deeplooplabs/ai-gateway/hook"
 	"github.com/deeplooplabs/ai-gateway/model"
-	"github.com/deeplooplabs/ai-gateway/openai"
 	"github.com/deeplooplabs/ai-gateway/provider"
+	openai2 "github.com/deeplooplabs/ai-gateway/provider/openai"
 )
 
 func TestGateway_New(t *testing.T) {
@@ -77,14 +77,14 @@ func (m *mockProvider) Name() string {
 	return "mock"
 }
 
-func (m *mockProvider) SendRequest(ctx context.Context, endpoint string, req *openai.ChatCompletionRequest) (*openai.ChatCompletionResponse, error) {
-	return &openai.ChatCompletionResponse{
+func (m *mockProvider) SendRequest(ctx context.Context, endpoint string, req *openai2.ChatCompletionRequest) (*openai2.ChatCompletionResponse, error) {
+	return &openai2.ChatCompletionResponse{
 		ID:     "test-id",
 		Object: "chat.completion",
 		Model:  req.Model,
-		Choices: []openai.Choice{{
+		Choices: []openai2.Choice{{
 			Index: 0,
-			Message: openai.Message{
+			Message: openai2.Message{
 				Role:    "assistant",
 				Content: "test response",
 			},
@@ -93,8 +93,8 @@ func (m *mockProvider) SendRequest(ctx context.Context, endpoint string, req *op
 	}, nil
 }
 
-func (m *mockProvider) SendRequestStream(ctx context.Context, endpoint string, req *openai.ChatCompletionRequest) (<-chan openai.StreamChunk, <-chan error) {
-	chunkChan := make(chan openai.StreamChunk)
+func (m *mockProvider) SendRequestStream(ctx context.Context, endpoint string, req *openai2.ChatCompletionRequest) (<-chan openai2.StreamChunk, <-chan error) {
+	chunkChan := make(chan openai2.StreamChunk)
 	errChan := make(chan error, 1)
 	go func() {
 		defer close(chunkChan)

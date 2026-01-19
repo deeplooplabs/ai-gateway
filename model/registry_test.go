@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/deeplooplabs/ai-gateway/openai"
 	"github.com/deeplooplabs/ai-gateway/provider"
+	openai2 "github.com/deeplooplabs/ai-gateway/provider/openai"
 )
 
 func TestMapModelRegistry(t *testing.T) {
@@ -55,12 +55,12 @@ func (m *mockProvider) Name() string {
 	return m.name
 }
 
-func (m *mockProvider) SendRequest(ctx context.Context, endpoint string, req *openai.ChatCompletionRequest) (*openai.ChatCompletionResponse, error) {
+func (m *mockProvider) SendRequest(ctx context.Context, endpoint string, req *openai2.ChatCompletionRequest) (*openai2.ChatCompletionResponse, error) {
 	return nil, nil
 }
 
-func (m *mockProvider) SendRequestStream(ctx context.Context, endpoint string, req *openai.ChatCompletionRequest) (<-chan openai.StreamChunk, <-chan error) {
-	chunkChan := make(chan openai.StreamChunk)
+func (m *mockProvider) SendRequestStream(ctx context.Context, endpoint string, req *openai2.ChatCompletionRequest) (<-chan openai2.StreamChunk, <-chan error) {
+	chunkChan := make(chan openai2.StreamChunk)
 	errChan := make(chan error, 1)
 	go func() {
 		defer close(chunkChan)

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/deeplooplabs/ai-gateway/openai"
+	"github.com/deeplooplabs/ai-gateway/provider/openai"
 )
 
 // Hook is the base interface for all hooks

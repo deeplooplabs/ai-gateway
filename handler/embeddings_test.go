@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/deeplooplabs/ai-gateway/hook"
-	"github.com/deeplooplabs/ai-gateway/openai"
+	openai2 "github.com/deeplooplabs/ai-gateway/provider/openai"
 )
 
 func TestEmbeddingsHandler_ServeHTTP(t *testing.T) {
@@ -37,7 +37,7 @@ func TestEmbeddingsHandler_ServeHTTP(t *testing.T) {
 		t.Errorf("expected 200, got %d: %s", w.Code, w.Body.String())
 	}
 
-	var resp openai.EmbeddingResponse
+	var resp openai2.EmbeddingResponse
 	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 		t.Fatalf("failed to decode response: %v", err)
 	}
@@ -56,11 +56,11 @@ func (m *mockEmbeddingsProvider) Name() string {
 	return "mock-embeddings"
 }
 
-func (m *mockEmbeddingsProvider) SendRequest(ctx context.Context, endpoint string, req *openai.ChatCompletionRequest) (*openai.ChatCompletionResponse, error) {
-	return &openai.ChatCompletionResponse{}, nil
+func (m *mockEmbeddingsProvider) SendRequest(ctx context.Context, endpoint string, req *openai2.ChatCompletionRequest) (*openai2.ChatCompletionResponse, error) {
+	return &openai2.ChatCompletionResponse{}, nil
 }
 
-func (m *mockEmbeddingsProvider) SendRequestStream(ctx context.Context, endpoint string, req *openai.ChatCompletionRequest) (<-chan openai.StreamChunk, <-chan error) {
+func (m *mockEmbeddingsProvider) SendRequestStream(ctx context.Context, endpoint string, req *openai2.ChatCompletionRequest) (<-chan openai2.StreamChunk, <-chan error) {
 	return nil, nil
 }
 

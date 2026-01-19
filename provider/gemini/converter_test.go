@@ -3,7 +3,7 @@ package gemini
 import (
 	"testing"
 
-	"github.com/deeplooplabs/ai-gateway/openai"
+	"github.com/deeplooplabs/ai-gateway/provider/openai"
 )
 
 func TestOpenAIToGemini(t *testing.T) {
@@ -122,7 +122,7 @@ func TestGeminiToOpenAI(t *testing.T) {
 		Candidates: []Candidate{
 			{
 				Content: Content{
-					Role: "model",
+					Role:  "model",
 					Parts: []Part{{Text: "Hello there!"}},
 				},
 				FinishReason: "STOP",

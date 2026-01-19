@@ -6,7 +6,7 @@ import (
 	"net/http"
 
 	"github.com/deeplooplabs/ai-gateway/hook"
-	"github.com/deeplooplabs/ai-gateway/openai"
+	"github.com/deeplooplabs/ai-gateway/provider/openai"
 )
 
 // EmbeddingsHandler handles embedding requests

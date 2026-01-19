@@ -6,7 +6,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/deeplooplabs/ai-gateway/openai"
+	openai2 "github.com/deeplooplabs/ai-gateway/provider/openai"
 )
 
 func TestHTTPProvider_SendRequestStream(t *testing.T) {
@@ -27,14 +27,14 @@ data: [DONE]
 
 	provider := NewHTTPProvider(server.URL, "test-key")
 
-	req := &openai.ChatCompletionRequest{
-		Model: "gpt-4",
-		Messages: []openai.Message{{Role: "user", Content: "test"}},
+	req := &openai2.ChatCompletionRequest{
+		Model:    "gpt-4",
+		Messages: []openai2.Message{{Role: "user", Content: "test"}},
 	}
 
 	chunkChan, errChan := provider.SendRequestStream(context.Background(), "/v1/chat/completions", req)
 
-	chunks := []openai.StreamChunk{}
+	chunks := []openai2.StreamChunk{}
 	for chunk := range chunkChan {
 		chunks = append(chunks, chunk)
 		if chunk.Done {

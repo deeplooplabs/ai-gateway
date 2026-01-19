@@ -9,8 +9,8 @@ import (
 	"testing"
 
 	"github.com/deeplooplabs/ai-gateway/hook"
-	"github.com/deeplooplabs/ai-gateway/openai"
 	"github.com/deeplooplabs/ai-gateway/provider"
+	openai2 "github.com/deeplooplabs/ai-gateway/provider/openai"
 )
 
 func TestChatHandler_ServeHTTP(t *testing.T) {
@@ -43,7 +43,7 @@ func TestChatHandler_ServeHTTP(t *testing.T) {
 		t.Errorf("expected 200, got %d: %s", w.Code, w.Body.String())
 	}
 
-	var resp openai.ChatCompletionResponse
+	var resp openai2.ChatCompletionResponse
 	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 		t.Fatalf("failed to decode response: %v", err)
 	}
@@ -103,20 +103,20 @@ func (m *mockChatProvider) Name() string {
 	return "mock"
 }
 
-func (m *mockChatProvider) SendRequest(ctx context.Context, endpoint string, req *openai.ChatCompletionRequest) (*openai.ChatCompletionResponse, error) {
-	return &openai.ChatCompletionResponse{
+func (m *mockChatProvider) SendRequest(ctx context.Context, endpoint string, req *openai2.ChatCompletionRequest) (*openai2.ChatCompletionResponse, error) {
+	return &openai2.ChatCompletionResponse{
 		ID:     "test-id",
 		Object: "chat.completion",
 		Model:  req.Model,
-		Choices: []openai.Choice{{
+		Choices: []openai2.Choice{{
 			Index: 0,
-			Message: openai.Message{
+			Message: openai2.Message{
 				Role:    "assistant",
 				Content: "Hello!",
 			},
 			FinishReason: "stop",
 		}},
-		Usage: openai.Usage{
+		Usage: openai2.Usage{
 			PromptTokens:     10,
 			CompletionTokens: 5,
 			TotalTokens:      15,
@@ -124,8 +124,8 @@ func (m *mockChatProvider) SendRequest(ctx context.Context, endpoint string, req
 	}, nil
 }
 
-func (m *mockChatProvider) SendRequestStream(ctx context.Context, endpoint string, req *openai.ChatCompletionRequest) (<-chan openai.StreamChunk, <-chan error) {
-	chunkChan := make(chan openai.StreamChunk, 2)
+func (m *mockChatProvider) SendRequestStream(ctx context.Context, endpoint string, req *openai2.ChatCompletionRequest) (<-chan openai2.StreamChunk, <-chan error) {
+	chunkChan := make(chan openai2.StreamChunk, 2)
 	errChan := make(chan error, 1)
 
 	go func() {
@@ -134,10 +134,10 @@ func (m *mockChatProvider) SendRequestStream(ctx context.Context, endpoint strin
 
 		// Send a mock chunk
 		chunkData := `{"id":"test-id","object":"chat.completion.chunk","created":1234567890,"model":"` + req.Model + `","choices":[{"index":0,"delta":{"content":"Hello!"},"finish_reason":null}]}`
-		chunkChan <- openai.StreamChunk{Data: []byte(chunkData)}
+		chunkChan <- openai2.StreamChunk{Data: []byte(chunkData)}
 
 		// Send done marker
-		chunkChan <- openai.StreamChunk{Done: true}
+		chunkChan <- openai2.StreamChunk{Done: true}
 	}()
 
 	return chunkChan, errChan

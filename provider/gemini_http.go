@@ -9,8 +9,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/deeplooplabs/ai-gateway/gemini"
-	"github.com/deeplooplabs/ai-gateway/openai"
+	gemini2 "github.com/deeplooplabs/ai-gateway/provider/gemini"
+	"github.com/deeplooplabs/ai-gateway/provider/openai"
 )
 
 // GeminiHTTPProvider sends requests to Gemini via HTTP
@@ -58,7 +58,7 @@ func (p *GeminiHTTPProvider) sendChatRequest(ctx context.Context, req *openai.Ch
 	if model == "" {
 		model = "gemini-pro"
 	}
-	geminiReq := gemini.OpenAIToGemini(req, model)
+	geminiReq := gemini2.OpenAIToGemini(req, model)
 
 	body, err := json.Marshal(geminiReq)
 	if err != nil {
@@ -86,13 +86,13 @@ func (p *GeminiHTTPProvider) sendChatRequest(ctx context.Context, req *openai.Ch
 		return nil, fmt.Errorf("unexpected status %d: %s", resp.StatusCode, string(respBody))
 	}
 
-	var geminiResp gemini.GenerateContentResponse
+	var geminiResp gemini2.GenerateContentResponse
 	if err := json.NewDecoder(resp.Body).Decode(&geminiResp); err != nil {
 		return nil, fmt.Errorf("decode response: %w", err)
 	}
 
 	// Convert back to OpenAI format
-	return gemini.GeminiToOpenAI(&geminiResp, model), nil
+	return gemini2.GeminiToOpenAI(&geminiResp, model), nil
 }
 
 func (p *GeminiHTTPProvider) sendEmbeddingsRequest(ctx context.Context, req *openai.ChatCompletionRequest) (*openai.ChatCompletionResponse, error) {
