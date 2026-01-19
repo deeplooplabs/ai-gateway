@@ -5,8 +5,8 @@ env:
   RELEASE_COMMENT: "v0.1.0: init release, for debug"
 
 tasks:
-  release:
+  release-tag:
     dir: '{{.USER_WORKING_DIR}}'
     cmds:
-      - git tag -a {{ .Version }} -m "{{ .Comment }}"
-      - git push origin {{ .Version }}
+      - git tag -a $RELEASE_VERSION -m "$RELEASE_COMMENT"
+      - git push origin $RELEASE_VERSION
