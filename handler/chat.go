@@ -38,9 +38,10 @@ func (h *ChatHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Ensure request body is closed
 	defer r.Body.Close()
 
+	ctx := r.Context()
 	// Call AuthenticationHooks to validate Authorization header
 	for _, hh := range h.hooks.AuthenticationHooks() {
-		success, userID, err := hh.Authenticate(r.Context(), r.Header.Get("Authorization"))
+		success, tenantID, err := hh.Authenticate(ctx, r.Header.Get("Authorization"))
 		if err != nil {
 			h.writeError(w, r, fmt.Errorf("authentication failed: %w", err))
 			return
@@ -49,8 +50,9 @@ func (h *ChatHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			h.writeError(w, r, NewValidationError("authentication failed"))
 			return
 		}
-		// Store userID in request context for downstream use
-		_ = userID // TODO: integrate userID into request context
+		// Store tenantID in request context for downstream use
+		//_ = tenantID // TODO: integrate tenantID into request context
+		ctx = context.WithValue(ctx, "tenant_id", tenantID)
 	}
 
 	// Parse request

@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/deeplooplabs/ai-gateway/gateway"
 	"github.com/deeplooplabs/ai-gateway/hook"
@@ -26,7 +27,7 @@ func main() {
 
 	// Create hooks
 	hooks := hook.NewRegistry()
-	hooks.Register(&LoggingHook{})
+	hooks.Register(&LoggingHook{}, &AuthenticateHook{})
 
 	// Create gateway
 	gw := gateway.New(
@@ -39,6 +40,27 @@ func main() {
 	log.Fatal(http.ListenAndServe(":8083", gw))
 }
 
+type AuthenticateHook struct{}
+
+func (h *AuthenticateHook) Name() string {
+	return "authenticate"
+}
+
+func (h *AuthenticateHook) Authenticate(ctx context.Context, apiKey string) (bool, string, error) {
+	splits := strings.Split(apiKey, ":")
+	if len(splits) < 1 {
+		return false, "", nil
+	}
+	var jwt, teamId string
+	jwt = splits[0]
+	if len(splits) == 2 {
+		teamId = splits[1]
+	}
+	return jwt != "" && teamId != "", teamId, nil
+}
+
+var _ hook.AuthenticationHook = new(AuthenticateHook)
+
 // LoggingHook logs all requests
 type LoggingHook struct{}
 
@@ -48,7 +70,8 @@ func (h *LoggingHook) BeforeRequest(ctx context.Context, req *openai.ChatComplet
 }
 
 func (h *LoggingHook) AfterRequest(ctx context.Context, req *openai.ChatCompletionRequest, resp *openai.ChatCompletionResponse) error {
-	slog.InfoContext(ctx, "[Hook] AfterRequest", "request", jsonString(req), "response", jsonString(resp))
+	tenantID := ctx.Value("tenant_id").(string)
+	slog.InfoContext(ctx, "[Hook] AfterRequest", "request", jsonString(req), "response", jsonString(resp), "tenant_id", tenantID)
 	return nil
 }
 

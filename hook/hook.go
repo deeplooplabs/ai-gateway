@@ -2,6 +2,8 @@ package hook
 
 import (
 	"context"
+	"fmt"
+	"log/slog"
 
 	"github.com/deeplooplabs/ai-gateway/openai"
 )
@@ -64,20 +66,24 @@ func NewRegistry() *Registry {
 }
 
 // Register registers a hook based on its concrete type
-func (r *Registry) Register(hook Hook) {
-	// Always add to general hooks list
-	r.hooks = append(r.hooks, hook)
+func (r *Registry) Register(hooks ...Hook) {
+	for _, hook := range hooks {
+		// Always add to general hooks list
+		r.hooks = append(r.hooks, hook)
 
-	// Also add to specific type lists if applicable
-	switch h := hook.(type) {
-	case AuthenticationHook:
-		r.authenticationHooks = append(r.authenticationHooks, h)
-	case RequestHook:
-		r.requestHooks = append(r.requestHooks, h)
-	case StreamingHook:
-		r.streamingHooks = append(r.streamingHooks, h)
-	case ErrorHook:
-		r.errorHooks = append(r.errorHooks, h)
+		// Also add to specific type lists if applicable
+		switch h := hook.(type) {
+		case AuthenticationHook:
+			r.authenticationHooks = append(r.authenticationHooks, h)
+		case RequestHook:
+			r.requestHooks = append(r.requestHooks, h)
+		case StreamingHook:
+			r.streamingHooks = append(r.streamingHooks, h)
+		case ErrorHook:
+			r.errorHooks = append(r.errorHooks, h)
+		default:
+			slog.Warn(fmt.Sprintf("unknown hook type: %T", h))
+		}
 	}
 }
 

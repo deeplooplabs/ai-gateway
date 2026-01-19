@@ -2,7 +2,7 @@ import time  # for measuring time duration of API calls
 from openai import OpenAI
 import os
 def main():
-    client = OpenAI(api_key="", base_url="http://localhost:8083/v1")
+    client = OpenAI(api_key="1234566:team-1", base_url="http://localhost:8083/v1")
 
     start_time = time.time()
 
