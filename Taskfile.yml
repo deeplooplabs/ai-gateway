@@ -1,0 +1,19 @@
+version: '3'
+
+env:
+  RELEASE_VERSION: v0.1.0
+  RELEASE_COMMENT: "release v0.1.0 init release, for debug"
+
+tasks:
+  release-tag:
+    dir: '{{.USER_WORKING_DIR}}'
+    cmds:
+      - git tag -a {{ .Version }} -m "{{ .Comment }}"
+      - git push origin {{ .Version }}
+
+  release:
+    cmds:
+      - task: release-tag
+        vars:
+          Version: $RELEASE_VERSION
+          Comment: $RELEASE_COMMENT
