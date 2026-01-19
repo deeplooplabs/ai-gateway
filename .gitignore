@@ -10,3 +10,5 @@ protobuf
 node_modules
 
 *.exe
+
+.worktrees
