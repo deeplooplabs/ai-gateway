@@ -114,3 +114,48 @@ func mapFinishReason(reason string) string {
 		return "stop"
 	}
 }
+
+// EmbeddingsOpenAIToGemini converts OpenAI embedding request to Gemini format
+func EmbeddingsOpenAIToGemini(req *openai.EmbeddingRequest) *EmbedContentRequest {
+	// Extract input text
+	var text string
+	switch v := req.Input.(type) {
+	case string:
+		text = v
+	case []string:
+		if len(v) > 0 {
+			text = v[0] // Gemini API only supports single input
+		}
+	case []interface{}:
+		if len(v) > 0 {
+			if s, ok := v[0].(string); ok {
+				text = s
+			}
+		}
+	}
+
+	return &EmbedContentRequest{
+		Content: Content{
+			Parts: []Part{{Text: text}},
+		},
+		TaskType: "RETRIEVAL_DOCUMENT",
+	}
+}
+
+// EmbeddingsGeminiToOpenAI converts Gemini embedding response to OpenAI format
+func EmbeddingsGeminiToOpenAI(resp *EmbedContentResponse, model string) *openai.EmbeddingResponse {
+	return &openai.EmbeddingResponse{
+		Object: "list",
+		Data: []openai.Embedding{
+			{
+				Object:    "embedding",
+				Embedding: resp.Embedding.Values,
+				Index:     0,
+			},
+		},
+		Model: model,
+		Usage: openai.Usage{
+			TotalTokens: len(resp.Embedding.Values), // Approximate
+		},
+	}
+}

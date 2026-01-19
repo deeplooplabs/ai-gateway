@@ -151,3 +151,33 @@ func TestGeminiToOpenAI(t *testing.T) {
 		t.Errorf("expected total tokens 8, got %d", openaiResp.Usage.TotalTokens)
 	}
 }
+
+func TestEmbeddingsOpenAIToGemini(t *testing.T) {
+	openaiReq := &openai.EmbeddingRequest{
+		Input: "Hello world",
+		Model: "text-embedding-004",
+	}
+
+	geminiReq := EmbeddingsOpenAIToGemini(openaiReq)
+
+	if geminiReq.Content.Parts[0].Text != "Hello world" {
+		t.Errorf("expected text 'Hello world', got '%s'", geminiReq.Content.Parts[0].Text)
+	}
+}
+
+func TestEmbeddingsGeminiToOpenAI(t *testing.T) {
+	geminiResp := &EmbedContentResponse{
+		Embedding: EmbeddingValue{
+			Values: []float32{0.1, 0.2, 0.3},
+		},
+	}
+
+	openaiResp := EmbeddingsGeminiToOpenAI(geminiResp, "text-embedding-004")
+
+	if len(openaiResp.Data) != 1 {
+		t.Errorf("expected 1 embedding, got %d", len(openaiResp.Data))
+	}
+	if len(openaiResp.Data[0].Embedding) != 3 {
+		t.Errorf("expected embedding length 3, got %d", len(openaiResp.Data[0].Embedding))
+	}
+}
