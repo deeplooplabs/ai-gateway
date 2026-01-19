@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"fmt"
+	"encoding/json"
 	"log"
 	"log/slog"
 	"net/http"
@@ -43,13 +43,18 @@ func main() {
 type LoggingHook struct{}
 
 func (h *LoggingHook) BeforeRequest(ctx context.Context, req *openai.ChatCompletionRequest) error {
-	slog.InfoContext(ctx, fmt.Sprintf("[Hook] BeforeRequest: model=%v", req))
+	slog.InfoContext(ctx, "[Hook] BeforeRequest", "request", jsonString(req))
 	return nil
 }
 
 func (h *LoggingHook) AfterRequest(ctx context.Context, req *openai.ChatCompletionRequest, resp *openai.ChatCompletionResponse) error {
-	slog.InfoContext(ctx, "[Hook] AfterRequest")
+	slog.InfoContext(ctx, "[Hook] AfterRequest", "request", jsonString(req), "response", jsonString(resp))
 	return nil
+}
+
+func jsonString(v interface{}) string {
+	s, _ := json.Marshal(v)
+	return string(s)
 }
 
 func (h *LoggingHook) Name() string {
