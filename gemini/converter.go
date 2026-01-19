@@ -56,3 +56,58 @@ func OpenAIToGemini(req *openai.ChatCompletionRequest, model string) *GenerateCo
 
 	return geminiReq
 }
+
+// GeminiToOpenAI converts a Gemini response to OpenAI format
+func GeminiToOpenAI(resp *GenerateContentResponse, model string) *openai.ChatCompletionResponse {
+	openaiResp := &openai.ChatCompletionResponse{
+		ID:      "gemini-" + model,
+		Object:  "chat.completion",
+		Created: 0, // Gemini doesn't provide timestamp
+		Model:   model,
+		Choices: make([]openai.Choice, 0, len(resp.Candidates)),
+		Usage: openai.Usage{
+			PromptTokens:     resp.UsageMetadata.PromptTokenCount,
+			CompletionTokens: resp.UsageMetadata.CandidatesTokenCount,
+			TotalTokens:      resp.UsageMetadata.TotalTokenCount,
+		},
+	}
+
+	for _, candidate := range resp.Candidates {
+		// Extract text from parts
+		var content string
+		for _, part := range candidate.Content.Parts {
+			content += part.Text
+		}
+
+		// Map finish reason
+		finishReason := mapFinishReason(candidate.FinishReason)
+
+		choice := openai.Choice{
+			Index: candidate.Index,
+			Message: openai.Message{
+				Role:    "assistant",
+				Content: content,
+			},
+			FinishReason: finishReason,
+		}
+		openaiResp.Choices = append(openaiResp.Choices, choice)
+	}
+
+	return openaiResp
+}
+
+// mapFinishReason maps Gemini finish reasons to OpenAI format
+func mapFinishReason(reason string) string {
+	switch reason {
+	case "STOP":
+		return "stop"
+	case "MAX_TOKENS":
+		return "length"
+	case "SAFETY":
+		return "content_filter"
+	case "RECITATION":
+		return "content_filter"
+	default:
+		return "stop"
+	}
+}

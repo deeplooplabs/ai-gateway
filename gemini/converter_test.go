@@ -116,3 +116,38 @@ func TestOpenAIToGeminiWithStopSequences(t *testing.T) {
 		t.Errorf("expected 2 stop sequences, got %d", len(geminiReq.GenerationConfig.StopSequences))
 	}
 }
+
+func TestGeminiToOpenAI(t *testing.T) {
+	geminiResp := &GenerateContentResponse{
+		Candidates: []Candidate{
+			{
+				Content: Content{
+					Role: "model",
+					Parts: []Part{{Text: "Hello there!"}},
+				},
+				FinishReason: "STOP",
+				Index:        0,
+			},
+		},
+		UsageMetadata: UsageMetadata{
+			PromptTokenCount:     5,
+			CandidatesTokenCount: 3,
+			TotalTokenCount:      8,
+		},
+	}
+
+	openaiResp := GeminiToOpenAI(geminiResp, "gemini-pro")
+
+	if len(openaiResp.Choices) != 1 {
+		t.Errorf("expected 1 choice, got %d", len(openaiResp.Choices))
+	}
+	if openaiResp.Choices[0].Message.Content != "Hello there!" {
+		t.Errorf("expected content 'Hello there!', got '%s'", openaiResp.Choices[0].Message.Content)
+	}
+	if openaiResp.Choices[0].FinishReason != "stop" {
+		t.Errorf("expected finish_reason 'stop', got '%s'", openaiResp.Choices[0].FinishReason)
+	}
+	if openaiResp.Usage.TotalTokens != 8 {
+		t.Errorf("expected total tokens 8, got %d", openaiResp.Usage.TotalTokens)
+	}
+}
