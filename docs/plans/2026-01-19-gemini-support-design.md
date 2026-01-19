@@ -222,7 +222,7 @@ gw := gateway.New(gateway.WithModelRegistry(registry))
 ## Dependencies
 
 ```
-require cloud.google.com/go/ai v0.2.0
+require cloud.google.com/go/ai v0.15.0
 ```
 
 ## Error Handling
