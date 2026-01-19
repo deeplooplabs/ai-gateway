@@ -11,6 +11,9 @@ import (
 
 // EmbeddingsHandler handles embedding requests
 type EmbeddingsHandler struct {
+	// registry is typed as `any` to avoid circular dependencies.
+	// The handler only needs the Resolve(model string) (any, string) method,
+	// which is checked via a local interface type assertion in ServeHTTP.
 	registry any
 	hooks    *hook.Registry
 }
@@ -84,7 +87,10 @@ func (h *EmbeddingsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// Write response
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(resp)
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		h.writeError(w, r, NewProviderError("failed to encode response", err))
+		return
+	}
 }
 
 func (h *EmbeddingsHandler) writeError(w http.ResponseWriter, r *http.Request, err error) {
