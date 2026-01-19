@@ -1,14 +1,17 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
+	"log/slog"
 	"net/http"
 	"os"
 
 	"github.com/deeplooplabs/ai-gateway/gateway"
 	"github.com/deeplooplabs/ai-gateway/hook"
 	"github.com/deeplooplabs/ai-gateway/model"
+	"github.com/deeplooplabs/ai-gateway/openai"
 	"github.com/deeplooplabs/ai-gateway/provider"
 )
 
@@ -32,23 +35,25 @@ func main() {
 	)
 
 	// Start server
-	fmt.Println("AI Gateway listening on :8083")
+	slog.Info("AI Gateway listening on :8083")
 	log.Fatal(http.ListenAndServe(":8083", gw))
 }
 
 // LoggingHook logs all requests
 type LoggingHook struct{}
 
+func (h *LoggingHook) BeforeRequest(ctx context.Context, req *openai.ChatCompletionRequest) error {
+	slog.InfoContext(ctx, fmt.Sprintf("[Hook] BeforeRequest: model=%v", req))
+	return nil
+}
+
+func (h *LoggingHook) AfterRequest(ctx context.Context, req *openai.ChatCompletionRequest, resp *openai.ChatCompletionResponse) error {
+	slog.InfoContext(ctx, "[Hook] AfterRequest")
+	return nil
+}
+
 func (h *LoggingHook) Name() string {
 	return "logging"
 }
 
-func (h *LoggingHook) BeforeRequest(ctx any, req any) error {
-	fmt.Printf("[Hook] BeforeRequest: model=%v\n", req)
-	return nil
-}
-
-func (h *LoggingHook) AfterRequest(ctx any, req any, resp any) error {
-	fmt.Printf("[Hook] AfterRequest\n")
-	return nil
-}
+var _ hook.RequestHook = new(LoggingHook)
