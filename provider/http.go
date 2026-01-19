@@ -71,56 +71,15 @@ func (p *HTTPProvider) SendRequest(ctx context.Context, endpoint string, req *op
 }
 
 // SendRequestStream sends a streaming request via HTTP
+// TODO: Implement in Task 3
 func (p *HTTPProvider) SendRequestStream(ctx context.Context, endpoint string, req *openai.ChatCompletionRequest) (<-chan openai.StreamChunk, <-chan error) {
-	chunkChan := make(chan openai.StreamChunk, 16)
+	chunkChan := make(chan openai.StreamChunk)
 	errChan := make(chan error, 1)
 
 	go func() {
 		defer close(chunkChan)
 		defer close(errChan)
-
-		body, err := json.Marshal(req)
-		if err != nil {
-			errChan <- fmt.Errorf("marshal request: %w", err)
-			return
-		}
-
-		url := p.BaseURL + endpoint
-		httpReq, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(body))
-		if err != nil {
-			errChan <- fmt.Errorf("create request: %w", err)
-			return
-		}
-
-		httpReq.Header.Set("Content-Type", "application/json")
-		httpReq.Header.Set("Authorization", "Bearer "+p.APIKey)
-		httpReq.Header.Set("Accept", "text/event-stream")
-
-		resp, err := p.Client.Do(httpReq)
-		if err != nil {
-			errChan <- fmt.Errorf("send request: %w", err)
-			return
-		}
-		defer resp.Body.Close()
-
-		if resp.StatusCode != http.StatusOK {
-			respBody, _ := io.ReadAll(resp.Body)
-			errChan <- fmt.Errorf("unexpected status %d: %s", resp.StatusCode, string(respBody))
-			return
-		}
-
-		// Stream the response using bufio
-		scanner := openai.NewSSEScanner(resp.Body)
-		for scanner.Scan() {
-			chunk := scanner.Chunk()
-			chunkChan <- chunk
-			if chunk.Done {
-				return
-			}
-		}
-		if err := scanner.Err(); err != nil {
-			errChan <- err
-		}
+		errChan <- fmt.Errorf("SendRequestStream not yet implemented")
 	}()
 
 	return chunkChan, errChan

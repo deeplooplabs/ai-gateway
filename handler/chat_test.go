@@ -123,3 +123,13 @@ func (m *mockChatProvider) SendRequest(ctx context.Context, endpoint string, req
 		},
 	}, nil
 }
+
+func (m *mockChatProvider) SendRequestStream(ctx context.Context, endpoint string, req *openai.ChatCompletionRequest) (<-chan openai.StreamChunk, <-chan error) {
+	chunkChan := make(chan openai.StreamChunk)
+	errChan := make(chan error, 1)
+	go func() {
+		defer close(chunkChan)
+		defer close(errChan)
+	}()
+	return chunkChan, errChan
+}
