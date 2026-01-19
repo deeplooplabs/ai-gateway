@@ -13,6 +13,12 @@ import (
 	"github.com/deeplooplabs/ai-gateway/provider"
 )
 
+// StreamingProvider is the provider interface for streaming requests
+type StreamingProvider interface {
+	provider.Provider
+	SendRequestStream(ctx context.Context, endpoint string, req *openai.ChatCompletionRequest) (<-chan openai.StreamChunk, <-chan error)
+}
+
 // ChatHandler handles chat completion requests
 type ChatHandler struct {
 	registry model.ModelRegistry
@@ -130,7 +136,7 @@ func (h *ChatHandler) handleStream(w http.ResponseWriter, r *http.Request, req *
 	w.Header().Set("Connection", "keep-alive")
 
 	// Type assert to StreamingProvider
-	streamingProvider, ok := prov.(interface{ SendRequestStream(context.Context, string, *openai.ChatCompletionRequest) (<-chan openai.StreamChunk, <-chan error) })
+	streamingProvider, ok := prov.(StreamingProvider)
 	if !ok {
 		h.writeError(w, r, NewValidationError("provider does not support streaming"))
 		return
