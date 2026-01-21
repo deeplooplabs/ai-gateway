@@ -70,16 +70,6 @@ func (r *MapModelRegistry) RegisterWithOptions(model string, prov provider.Provi
 	r.models[model] = pr
 }
 
-// RegisterWithRewrite registers a model with its provider and model rewrite
-// Deprecated: Use RegisterWithOptions with WithModelRewrite instead
-func (r *MapModelRegistry) RegisterWithRewrite(model string, prov provider.Provider, modelRewrite string) {
-	r.models[model] = ProviderRewrite{
-		Provider:     prov,
-		ModelRewrite: modelRewrite,
-		PreferredAPI: 0,
-	}
-}
-
 // Resolve returns the provider and model rewrite for a given model name
 func (r *MapModelRegistry) Resolve(model string) (provider.Provider, string) {
 	if pr, ok := r.models[model]; ok {
