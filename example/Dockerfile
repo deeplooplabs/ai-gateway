@@ -20,8 +20,9 @@ RUN apk --no-cache add ca-certificates
 
 WORKDIR /root/
 
-# Copy the binary from builder
+# Copy the binary from builder and set permissions
 COPY --from=builder /app/ai-gateway-example .
+RUN chmod +x ai-gateway-example
 
 # Expose port
 EXPOSE 8083
