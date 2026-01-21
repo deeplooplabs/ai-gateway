@@ -228,36 +228,41 @@ const (
 )
 
 // Response represents the API response
+// All fields marked as required in the OpenResponses specification must be present,
+// even when null (for pointer types or nullable fields)
 type Response struct {
 	ID                string             `json:"id"`
 	Object            string             `json:"object"` // "response"
 	Status            ResponseStatusEnum `json:"status"`
 	CreatedAt         int64              `json:"created_at"`
-	CompletedAt       *int64             `json:"completed_at,omitempty"`
+	CompletedAt       *int64             `json:"completed_at"` // Required, can be null
 	Model             string             `json:"model"`
-	PreviousResponseID string            `json:"previous_response_id,omitempty"`
-	Instructions      string             `json:"instructions,omitempty"`
+	PreviousResponseID *string            `json:"previous_response_id"` // Required, can be null
+	Instructions      *string            `json:"instructions"` // Required, can be null
 	Output            []ItemField        `json:"output"`
-	Error             *Error             `json:"error,omitempty"`
-	Tools             []Tool             `json:"tools,omitempty"`
-	ToolChoice        ToolChoiceParam    `json:"tool_choice,omitempty"`
-	Truncation        TruncationEnum     `json:"truncation,omitempty"`
-	ParallelToolCalls *bool              `json:"parallel_tool_calls,omitempty"`
-	Text              *TextField         `json:"text,omitempty"`
-	TopP              *float64            `json:"top_p,omitempty"`
-	PresencePenalty   *float64            `json:"presence_penalty,omitempty"`
-	FrequencyPenalty  *float64            `json:"frequency_penalty,omitempty"`
-	TopLogprobs       *int               `json:"top_logprobs,omitempty"`
-	Reasoning         *Reasoning         `json:"reasoning,omitempty"`
-	Usage             *Usage             `json:"usage,omitempty"`
-	MaxOutputTokens   int                `json:"max_output_tokens,omitempty"`
-	MaxToolCalls      int                `json:"max_tool_calls,omitempty"`
-	Store             *bool              `json:"store,omitempty"`
-	Background        *bool              `json:"background,omitempty"`
-	ServiceTier       string             `json:"service_tier,omitempty"`
-	Metadata          *MetadataParam     `json:"metadata,omitempty"`
-	SafetyIdentifier  string             `json:"safety_identifier,omitempty"`
-	PromptCacheKey    string             `json:"prompt_cache_key,omitempty"`
+	Error             *Error             `json:"error"` // Required, can be null
+	Tools             []Tool             `json:"tools"`
+	ToolChoice        ToolChoiceParam    `json:"tool_choice"` // Required
+	Truncation        TruncationEnum     `json:"truncation"`
+	ParallelToolCalls bool               `json:"parallel_tool_calls"`
+	Text              TextField          `json:"text"` // Required (object with format)
+	TopP              float64            `json:"top_p"`
+	PresencePenalty   float64            `json:"presence_penalty"`
+	FrequencyPenalty  float64            `json:"frequency_penalty"`
+	TopLogprobs       int                `json:"top_logprobs"`
+	Temperature       float64            `json:"temperature"` // Required
+	Reasoning         *Reasoning         `json:"reasoning"` // Required, can be null
+	User              *string            `json:"user"` // Required, can be null
+	Usage             *Usage             `json:"usage"` // Required, can be null
+	MaxOutputTokens   *int               `json:"max_output_tokens"` // Required, can be null
+	MaxToolCalls      *int               `json:"max_tool_calls"` // Required, can be null
+	Store             bool               `json:"store"`
+	Background        bool               `json:"background"`
+	ServiceTier       string             `json:"service_tier"`
+	Metadata          *MetadataParam     `json:"metadata"` // Required, can be empty object
+	IncompleteDetails *IncompleteDetails `json:"incomplete_details"` // Required, null when not incomplete
+	SafetyIdentifier  *string            `json:"safety_identifier"` // Required, can be null
+	PromptCacheKey    *string            `json:"prompt_cache_key"` // Required, can be null
 }
 
 // ItemField represents an item in the output
@@ -302,8 +307,9 @@ type ReasoningItem struct {
 }
 
 // TextField represents text output configuration
+// Format is required per OpenResponses spec
 type TextField struct {
-	Format TextFormat `json:"format,omitempty"`
+	Format TextFormat `json:"format"` // Required
 }
 
 // TextFormat represents text format in the response
@@ -317,21 +323,21 @@ type Reasoning struct {
 
 // Usage represents token usage statistics
 type Usage struct {
-	InputTokens        int               `json:"input_tokens"`
-	OutputTokens       int               `json:"output_tokens"`
-	TotalTokens        int               `json:"total_tokens"`
-	InputTokensDetails *InputTokensDetails `json:"input_tokens_details,omitempty"`
-	OutputTokensDetails *OutputTokensDetails `json:"output_tokens_details,omitempty"`
+	InputTokens        int                 `json:"input_tokens"`
+	OutputTokens       int                 `json:"output_tokens"`
+	TotalTokens        int                 `json:"total_tokens"`
+	InputTokensDetails *InputTokensDetails `json:"input_tokens_details"`  // Required
+	OutputTokensDetails *OutputTokensDetails `json:"output_tokens_details"` // Required
 }
 
 // InputTokensDetails breaks down input token usage
 type InputTokensDetails struct {
-	CachedTokens int `json:"cached_tokens,omitempty"`
+	CachedTokens int `json:"cached_tokens"` // Default 0
 }
 
 // OutputTokensDetails breaks down output token usage
 type OutputTokensDetails struct {
-	ReasoningTokens int `json:"reasoning_tokens,omitempty"`
+	ReasoningTokens int `json:"reasoning_tokens"` // Default 0
 }
 
 // Error represents an error response
@@ -349,14 +355,63 @@ type IncompleteDetails struct {
 
 // NewResponse creates a new Response with initialized fields
 func NewResponse(id string, model string) *Response {
+	// Create empty metadata object
+	emptyMetadata := make(MetadataParam)
+
+	// Default text format - format is required
+	textFormat := &TextResponseFormat{Type: "text"}
+
 	return &Response{
-		ID:        id,
-		Object:    "response",
-		Status:    ResponseStatusInProgress,
-		CreatedAt: time.Now().Unix(),
-		Model:     model,
-		Output:    []ItemField{},
+		ID:                id,
+		Object:            "response",
+		Status:            ResponseStatusInProgress,
+		CreatedAt:         time.Now().Unix(),
+		CompletedAt:       nil, // null when in progress
+		Model:             model,
+		PreviousResponseID: nil, // null when not continuing
+		Instructions:      nil, // null when not provided
+		Output:            []ItemField{},
+		Error:             nil, // null when not failed
+		Tools:             []Tool{},
+		ToolChoice:        "auto", // Default tool choice
+		Truncation:        TruncationAuto,
+		ParallelToolCalls: true,
+		Text:              TextField{Format: textFormat}, // format is required
+		TopP:              1.0,
+		PresencePenalty:   0.0,
+		FrequencyPenalty:  0.0,
+		TopLogprobs:       0,
+		Temperature:       1.0,
+		Reasoning:         nil, // null when not reasoning
+		User:              nil, // null when not provided
+		Usage:             nil, // null until completion
+		MaxOutputTokens:   nil, // null when not set
+		MaxToolCalls:      nil, // null when not set
+		Store:             true,
+		Background:        false,
+		ServiceTier:       "auto",
+		Metadata:          &emptyMetadata,
+		IncompleteDetails: nil, // null when not incomplete
+		SafetyIdentifier:  nil, // null when not set
+		PromptCacheKey:    nil, // null when not set
 	}
+}
+
+// Helper functions for creating pointers to default values
+func boolPtr(b bool) *bool {
+	return &b
+}
+
+func float64Ptr(f float64) *float64 {
+	return &f
+}
+
+func int64Ptr(i int64) *int64 {
+	return &i
+}
+
+func intPtr(i int) *int {
+	return &i
 }
 
 // NewError creates a new Error

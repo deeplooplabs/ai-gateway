@@ -82,12 +82,21 @@ func TestCreateRequestWithArrayInput(t *testing.T) {
 }
 
 func TestResponseMarshal(t *testing.T) {
+	// Create empty metadata object
+	emptyMetadata := make(MetadataParam)
+
+	// Default text format - format is required
+	textFormat := &TextResponseFormat{Type: "text"}
+
 	resp := &Response{
 		ID:      "resp_abc123",
 		Object:  "response",
 		Status:  ResponseStatusCompleted,
 		CreatedAt: 1234567890,
+		CompletedAt: int64Ptr(1234567892),
 		Model:   "gpt-4o",
+		PreviousResponseID: nil,
+		Instructions:      nil,
 		Output: []ItemField{
 			&MessageItem{
 				ID:     "msg_xyz",
@@ -96,17 +105,43 @@ func TestResponseMarshal(t *testing.T) {
 				Role:   MessageRoleAssistant,
 				Content: []OutputTextContent{
 					{
-						Type: "output_text",
-						Text: "Hello, world!",
+						Type:        "output_text",
+						Text:        "Hello, world!",
+						Annotations: []Annotation{}, // Required, empty array
+						Logprobs:    []LogProb{},    // Required, empty array
 					},
 				},
 			},
 		},
+		Error:             nil,
+		Tools:             []Tool{},
+		Truncation:        TruncationAuto,
+		ParallelToolCalls: true,
+		Text:              TextField{Format: textFormat}, // format is required
+		TopP:              1.0,
+		PresencePenalty:   0.0,
+		FrequencyPenalty:  0.0,
+		TopLogprobs:       0,
+		Temperature:       1.0,
+		Reasoning:         nil,
+		User:              nil,
+		ToolChoice:        "auto",
+		Store:             true,
+		Background:        false,
+		ServiceTier:       "auto",
+		Metadata:          &emptyMetadata,
 		Usage: &Usage{
-			InputTokens:  10,
-			OutputTokens: 20,
-			TotalTokens:  30,
+			InputTokens:         10,
+			OutputTokens:        20,
+			TotalTokens:         30,
+			InputTokensDetails:  &InputTokensDetails{CachedTokens: 0},
+			OutputTokensDetails: &OutputTokensDetails{ReasoningTokens: 0},
 		},
+		MaxOutputTokens:   nil,
+		MaxToolCalls:      nil,
+		IncompleteDetails: nil,
+		SafetyIdentifier:  nil,
+		PromptCacheKey:    nil,
 	}
 
 	data, err := json.Marshal(resp)
@@ -129,6 +164,51 @@ func TestResponseMarshal(t *testing.T) {
 
 	if len(unmarshaled.Output) != 1 {
 		t.Fatalf("Expected 1 output item, got %d", len(unmarshaled.Output))
+	}
+
+	// Verify required fields are present in JSON output
+	jsonStr := string(data)
+	requiredFields := []string{
+		`"id":"resp_abc123"`,
+		`"object":"response"`,
+		`"status":"completed"`,
+		`"created_at":1234567890`,
+		`"completed_at":1234567892`,
+		`"model":"gpt-4o"`,
+		`"previous_response_id":null`,
+		`"instructions":null`,
+		`"output":[`,
+		`"error":null`,
+		`"tools":[]`,
+		`"tool_choice":"auto"`,
+		`"truncation":"auto"`,
+		`"parallel_tool_calls":true`,
+		`"text":{"format":{"type":"text"}}`,
+		`"top_p":1`,
+		`"presence_penalty":0`,
+		`"frequency_penalty":0`,
+		`"top_logprobs":0`,
+		`"temperature":1`,
+		`"reasoning":null`,
+		`"user":null`,
+		`"usage":{`,
+		`"max_output_tokens":null`,
+		`"max_tool_calls":null`,
+		`"store":true`,
+		`"background":false`,
+		`"service_tier":"auto"`,
+		`"metadata":{}`,
+		`"incomplete_details":null`,
+		`"safety_identifier":null`,
+		`"prompt_cache_key":null`,
+		`"annotations":[]`,
+		`"logprobs":[]`,
+	}
+
+	for _, field := range requiredFields {
+		if !contains(jsonStr, field) {
+			t.Errorf("Required field %s not found in JSON output: %s", field, jsonStr)
+		}
 	}
 }
 
@@ -269,6 +349,92 @@ func TestNewResponse(t *testing.T) {
 
 	if resp.Output == nil {
 		t.Error("Expected Output to be initialized")
+	}
+
+	// Verify required fields have default values
+	if resp.Tools == nil {
+		t.Error("Expected Tools to be initialized (required field)")
+	}
+
+	if resp.Truncation != TruncationAuto {
+		t.Errorf("Expected Truncation 'auto', got '%s'", resp.Truncation)
+	}
+
+	if !resp.ParallelToolCalls {
+		t.Error("Expected ParallelToolCalls to be true")
+	}
+
+	if resp.TopP != 1.0 {
+		t.Errorf("Expected TopP to be 1.0, got %v", resp.TopP)
+	}
+
+	if resp.PresencePenalty != 0.0 {
+		t.Errorf("Expected PresencePenalty to be 0.0, got %v", resp.PresencePenalty)
+	}
+
+	if resp.FrequencyPenalty != 0.0 {
+		t.Errorf("Expected FrequencyPenalty to be 0.0, got %v", resp.FrequencyPenalty)
+	}
+
+	if resp.TopLogprobs != 0 {
+		t.Errorf("Expected TopLogprobs to be 0, got %v", resp.TopLogprobs)
+	}
+
+	if !resp.Store {
+		t.Error("Expected Store to be true")
+	}
+
+	if resp.Background {
+		t.Error("Expected Background to be false")
+	}
+
+	if resp.ServiceTier != "auto" {
+		t.Errorf("Expected ServiceTier 'auto', got '%s'", resp.ServiceTier)
+	}
+
+	// Verify nullable fields are nil
+	if resp.PreviousResponseID != nil {
+		t.Error("Expected PreviousResponseID to be nil")
+	}
+
+	if resp.Instructions != nil {
+		t.Error("Expected Instructions to be nil")
+	}
+
+	if resp.Error != nil {
+		t.Error("Expected Error to be nil")
+	}
+
+	if resp.Reasoning != nil {
+		t.Error("Expected Reasoning to be nil")
+	}
+
+	if resp.User != nil {
+		t.Error("Expected User to be nil")
+	}
+
+	if resp.Usage != nil {
+		t.Error("Expected Usage to be nil for in_progress")
+	}
+
+	if resp.MaxOutputTokens != nil {
+		t.Error("Expected MaxOutputTokens to be nil")
+	}
+
+	if resp.MaxToolCalls != nil {
+		t.Error("Expected MaxToolCalls to be nil")
+	}
+
+	if resp.IncompleteDetails != nil {
+		t.Error("Expected IncompleteDetails to be nil")
+	}
+
+	if resp.SafetyIdentifier != nil {
+		t.Error("Expected SafetyIdentifier to be nil")
+	}
+
+	if resp.PromptCacheKey != nil {
+		t.Error("Expected PromptCacheKey to be nil")
 	}
 }
 

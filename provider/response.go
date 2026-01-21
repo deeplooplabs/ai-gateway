@@ -139,13 +139,16 @@ func (r *Response) GetChatCompletion() (*openai.ChatCompletionResponse, error) {
 }
 
 // GetORResponse returns the OpenResponses response, converting from Chat Completions if needed
+// Note: This method doesn't have access to the original request tools, so the response
+// will have an empty tools array. For proper tool inclusion, use the handler's conversion.
 func (r *Response) GetORResponse(responseID string) (*openresponses.Response, error) {
 	if r.ORResponse != nil {
 		return r.ORResponse, nil
 	}
 	if r.ChatCompletion != nil {
 		converter := openresponses.NewConverter()
-		return converter.ChatCompletionToResponse(r.ChatCompletion, responseID), nil
+		// Pass nil for tools - will result in empty array
+		return converter.ChatCompletionToResponse(r.ChatCompletion, responseID, nil), nil
 	}
 	return nil, fmt.Errorf("no response data available")
 }

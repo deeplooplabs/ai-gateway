@@ -26,20 +26,19 @@ func (e *BaseStreamingEvent) SetSequenceNumber(seq int)      { e.SequenceNumber 
 // ResponseCreatedEvent is emitted when a response is created
 type ResponseCreatedEvent struct {
 	BaseStreamingEvent
-	ResponseID string `json:"id"`
+	Response *Response `json:"response"`
 }
 
 // ResponseQueuedEvent is emitted when a response is queued
 type ResponseQueuedEvent struct {
 	BaseStreamingEvent
-	ResponseID string `json:"id"`
+	Response *Response `json:"response"`
 }
 
 // ResponseInProgressEvent is emitted when a response is in progress
 type ResponseInProgressEvent struct {
 	BaseStreamingEvent
-	ResponseID    string `json:"id,omitempty"`
-	UpdatedAt     int64  `json:"updated_at,omitempty"`
+	Response *Response `json:"response"`
 }
 
 // ResponseCompletedEvent is emitted when a response completes successfully
@@ -100,21 +99,21 @@ type ResponseContentPartDoneEvent struct {
 // ResponseOutputTextDeltaEvent is emitted when text delta is received
 type ResponseOutputTextDeltaEvent struct {
 	BaseStreamingEvent
-	ItemID       string `json:"item_id"`
-	OutputIndex  int    `json:"output_index"`
-	ContentIndex int    `json:"content_index"`
-	Delta        string `json:"delta"`
-	Logprobs     []LogProb `json:"logprobs,omitempty"`
+	ItemID       string   `json:"item_id"`
+	OutputIndex  int      `json:"output_index"`
+	ContentIndex int      `json:"content_index"`
+	Delta        string   `json:"delta"`
+	Logprobs     []LogProb `json:"logprobs"`
 }
 
 // ResponseOutputTextDoneEvent is emitted when text output is done
 type ResponseOutputTextDoneEvent struct {
 	BaseStreamingEvent
-	ItemID       string             `json:"item_id"`
-	OutputIndex  int                `json:"output_index"`
-	ContentIndex int                `json:"content_index"`
-	Text         string             `json:"text"`
-	Logprobs     []LogProb           `json:"logprobs,omitempty"`
+	ItemID       string   `json:"item_id"`
+	OutputIndex  int      `json:"output_index"`
+	ContentIndex int      `json:"content_index"`
+	Text         string   `json:"text"`
+	Logprobs     []LogProb `json:"logprobs"`
 }
 
 // ResponseRefusalDeltaEvent is emitted when refusal delta is received
@@ -259,23 +258,35 @@ type ErrorStreamingEvent struct {
 }
 
 // NewResponseCreatedEvent creates a new ResponseCreatedEvent
-func NewResponseCreatedEvent(seq int, responseID string) *ResponseCreatedEvent {
+func NewResponseCreatedEvent(seq int, response *Response) *ResponseCreatedEvent {
 	return &ResponseCreatedEvent{
 		BaseStreamingEvent: BaseStreamingEvent{
 			Type:          "response.created",
 			SequenceNumber: seq,
 		},
-		ResponseID: responseID,
+		Response: response,
+	}
+}
+
+// NewResponseQueuedEvent creates a new ResponseQueuedEvent
+func NewResponseQueuedEvent(seq int, response *Response) *ResponseQueuedEvent {
+	return &ResponseQueuedEvent{
+		BaseStreamingEvent: BaseStreamingEvent{
+			Type:          "response.queued",
+			SequenceNumber: seq,
+		},
+		Response: response,
 	}
 }
 
 // NewResponseInProgressEvent creates a new ResponseInProgressEvent
-func NewResponseInProgressEvent(seq int) *ResponseInProgressEvent {
+func NewResponseInProgressEvent(seq int, response *Response) *ResponseInProgressEvent {
 	return &ResponseInProgressEvent{
 		BaseStreamingEvent: BaseStreamingEvent{
 			Type:          "response.in_progress",
 			SequenceNumber: seq,
 		},
+		Response: response,
 	}
 }
 
@@ -351,6 +362,7 @@ func NewResponseOutputTextDeltaEvent(seq int, itemID string, outputIndex, conten
 		OutputIndex:  outputIndex,
 		ContentIndex: contentIndex,
 		Delta:        delta,
+		Logprobs:     []LogProb{},
 	}
 }
 
@@ -365,6 +377,7 @@ func NewResponseOutputTextDoneEvent(seq int, itemID string, outputIndex, content
 		OutputIndex:  outputIndex,
 		ContentIndex: contentIndex,
 		Text:         text,
+		Logprobs:     []LogProb{},
 	}
 }
 

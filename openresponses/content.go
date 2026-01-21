@@ -34,8 +34,8 @@ type ContentParam interface{}
 type OutputTextContent struct {
 	Type        string      `json:"type"` // "output_text"
 	Text        string      `json:"text"`
-	Annotations []Annotation `json:"annotations,omitempty"`
-	Logprobs    []LogProb    `json:"logprobs,omitempty"`
+	Annotations []Annotation `json:"annotations"` // Required, empty array when not used
+	Logprobs    []LogProb    `json:"logprobs"`    // Required, empty array when not used
 }
 
 // RefusalContent represents a refusal from the model

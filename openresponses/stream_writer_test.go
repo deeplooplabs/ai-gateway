@@ -22,19 +22,21 @@ func TestStreamWriter_WriteEvent(t *testing.T) {
 	}{
 		{
 			name: "ResponseCreatedEvent",
-			event: NewResponseCreatedEvent(1, "resp_123"),
+			event: NewResponseCreatedEvent(1, NewResponse("resp_123", "gpt-4o")),
 			contains: []string{
 				"event: response.created",
 				`"sequence_number":1`,
 				`"id":"resp_123"`,
+				`"response":{`,
 			},
 		},
 		{
 			name: "ResponseInProgressEvent",
-			event: NewResponseInProgressEvent(2),
+			event: NewResponseInProgressEvent(2, NewResponse("resp_123", "gpt-4o")),
 			contains: []string{
 				"event: response.in_progress",
 				`"sequence_number":2`,
+				`"response":{`,
 			},
 		},
 		{
@@ -137,7 +139,7 @@ func TestStreamWriter_WithHTTPResponseWriter(t *testing.T) {
 	recorder := httptest.NewRecorder()
 	writer := NewStreamWriter(recorder, recorder)
 
-	event := NewResponseCreatedEvent(1, "resp_test")
+	event := NewResponseCreatedEvent(1, NewResponse("resp_test", "gpt-4o"))
 	err := writer.WriteEvent(event)
 	if err != nil {
 		t.Fatalf("WriteEvent failed: %v", err)
@@ -193,7 +195,7 @@ func TestStreamWriter_WithNilFlusher(t *testing.T) {
 	var buf bytes.Buffer
 	writer := NewStreamWriter(&buf, nil)
 
-	event := NewResponseCreatedEvent(1, "resp_test")
+	event := NewResponseCreatedEvent(1, NewResponse("resp_test", "gpt-4o"))
 	err := writer.WriteEvent(event)
 	if err != nil {
 		t.Fatalf("WriteEvent failed: %v", err)
@@ -209,7 +211,7 @@ func TestStreamWriter_WithNilWriter(t *testing.T) {
 	flusher := &mockFlusher{}
 	writer := NewStreamWriter(nil, flusher)
 
-	event := NewResponseCreatedEvent(1, "resp_test")
+	event := NewResponseCreatedEvent(1, NewResponse("resp_test", "gpt-4o"))
 
 	// Should panic when writing to nil writer
 	defer func() {

@@ -163,7 +163,18 @@ func (h *ResponsesHandler) handleNonStream(ctx context.Context, w http.ResponseW
 		return
 	}
 
-	orResp := h.converter.ChatCompletionToResponse(chatResp, responseID)
+	// Convert tools from request to OpenResponses format for the response
+	var tools []openai2.Tool
+	if len(req.Tools) > 0 {
+		tools = make([]openai2.Tool, 0, len(req.Tools))
+		for _, tool := range req.Tools {
+			if fn, ok := tool.(*openai2.FunctionTool); ok {
+				tools = append(tools, fn)
+			}
+		}
+	}
+
+	orResp := h.converter.ChatCompletionToResponse(chatResp, responseID, tools)
 
 	// Write response
 	w.Header().Set("Content-Type", "application/json")
@@ -191,11 +202,14 @@ func (h *ResponsesHandler) handleStream(ctx context.Context, w http.ResponseWrit
 	// Generate response ID
 	responseID := "resp_" + uuid.New().String()
 
-	// Send response.created event
-	writer.WriteEvent(openai2.NewResponseCreatedEvent(writer.NextSequence(), responseID))
+	// Create initial response object for events
+	initResp := openai2.NewResponse(responseID, req.Model)
 
-	// Send response.in_progress event
-	writer.WriteEvent(openai2.NewResponseInProgressEvent(writer.NextSequence()))
+	// Send response.created event with full response object
+	writer.WriteEvent(openai2.NewResponseCreatedEvent(writer.NextSequence(), initResp))
+
+	// Send response.in_progress event with full response object
+	writer.WriteEvent(openai2.NewResponseInProgressEvent(writer.NextSequence(), initResp))
 
 	// Convert to OpenAI format
 	chatReq, err := h.converter.RequestToChatCompletion(req)
@@ -284,7 +298,7 @@ func (h *ResponsesHandler) handleStream(ctx context.Context, w http.ResponseWrit
 						Status: openai2.MessageStatusCompleted,
 						Role:   openai2.MessageRoleAssistant,
 						Content: []openai2.OutputTextContent{
-							{Type: "output_text", Text: ""},
+							{Type: "output_text", Text: "", Annotations: []openai2.Annotation{}, Logprobs: []openai2.LogProb{}},
 						},
 					}
 					orResp.Output = []openai2.ItemField{messageItem}
@@ -305,14 +319,14 @@ func (h *ResponsesHandler) handleStream(ctx context.Context, w http.ResponseWrit
 						Status: openai2.MessageStatusInProgress,
 						Role:   openai2.MessageRoleAssistant,
 						Content: []openai2.OutputTextContent{
-							{Type: "output_text", Text: ""},
+							{Type: "output_text", Text: "", Annotations: []openai2.Annotation{}, Logprobs: []openai2.LogProb{}},
 						},
 					}
 					writer.WriteEvent(openai2.NewResponseOutputItemAddedEvent(writer.NextSequence(), outputIndex, messageItem))
 					itemAdded = true
 
 					// Send content part added event
-					contentPart := openai2.OutputTextContent{Type: "output_text", Text: ""}
+					contentPart := openai2.OutputTextContent{Type: "output_text", Text: "", Annotations: []openai2.Annotation{}, Logprobs: []openai2.LogProb{}}
 					writer.WriteEvent(openai2.NewResponseContentPartAddedEvent(writer.NextSequence(), itemID, outputIndex, 0, contentPart))
 				}
 
