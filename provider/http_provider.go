@@ -35,6 +35,20 @@ func NewHTTPProviderWithBaseURL(baseURL, apiKey string) *HTTPProvider {
 	return NewHTTPProvider(config)
 }
 
+// NewHTTPProviderWithBaseURLAndPath creates a new HTTP provider with base URL, API key, and base path
+// The basePath is stripped from the endpoint before appending to base URL.
+// For example, with baseURL="https://api.siliconflow.cn/v1" and basePath="/v1",
+// the endpoint "/v1/chat/completions" becomes "https://api.siliconflow.cn/v1/chat/completions"
+func NewHTTPProviderWithBaseURLAndPath(baseURL, apiKey, basePath string) *HTTPProvider {
+	config := NewProviderConfig("http").
+		WithBaseURL(baseURL).
+		WithBasePath(basePath).
+		WithAPIKey(apiKey).
+		WithAPIType(APITypeChatCompletions)
+
+	return NewHTTPProvider(config)
+}
+
 // NewHTTPProviderFull creates a new HTTP provider with full configuration options
 func NewHTTPProviderFull(name, baseURL, apiKey string, supportedAPIs APIType) *HTTPProvider {
 	config := NewProviderConfig(name).

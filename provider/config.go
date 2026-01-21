@@ -45,6 +45,13 @@ type ProviderConfig struct {
 	// BaseURL is the base URL for the provider API
 	BaseURL string
 
+	// BasePath is the path prefix to strip from the endpoint before appending to BaseURL.
+	// For example, if BaseURL is "https://api.siliconflow.cn/v1" and BasePath is "/v1",
+	// then endpoint "/v1/chat/completions" will become "https://api.siliconflow.cn/v1/chat/completions"
+	// (the "/v1" prefix from the endpoint is stripped).
+	// Default is empty (no stripping).
+	BasePath string
+
 	// APIKey is the authentication key
 	APIKey string
 
@@ -96,6 +103,12 @@ func (c *ProviderConfig) WithAPIType(apiType APIType) *ProviderConfig {
 // WithBaseURL sets the base URL
 func (c *ProviderConfig) WithBaseURL(baseURL string) *ProviderConfig {
 	c.BaseURL = baseURL
+	return c
+}
+
+// WithBasePath sets the base path to strip from endpoints
+func (c *ProviderConfig) WithBasePath(basePath string) *ProviderConfig {
+	c.BasePath = basePath
 	return c
 }
 

@@ -148,10 +148,23 @@ func (p *BaseProvider) SendRequestToOpenAIProvider(ctx context.Context, req *Req
 	}
 
 	// Build URL
-	url := p.config.BaseURL + req.Endpoint
-	if req.Endpoint == "" {
-		url = p.config.BaseURL + "/v1/chat/completions"
+	endpoint := req.Endpoint
+	if endpoint == "" {
+		endpoint = "/v1/chat/completions"
 	}
+
+	// Strip BasePath prefix from endpoint if configured
+	if p.config.BasePath != "" && len(endpoint) >= len(p.config.BasePath) {
+		if endpoint[:len(p.config.BasePath)] == p.config.BasePath {
+			endpoint = endpoint[len(p.config.BasePath):]
+			// Ensure endpoint starts with /
+			if len(endpoint) > 0 && endpoint[0] != '/' {
+				endpoint = "/" + endpoint
+			}
+		}
+	}
+
+	url := p.config.BaseURL + endpoint
 
 	// Set headers
 	headers := req.Headers

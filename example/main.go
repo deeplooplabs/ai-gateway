@@ -18,29 +18,55 @@ import (
 
 func main() {
 	// Create providers using the new API
-	openAIProvider := provider.NewHTTPProviderWithBaseURL(
+
+	// Example 1: Standard provider (BaseURL doesn't include /v1)
+	openAIProvider := provider.NewHTTPProviderWithBaseURLAndPath(
 		os.Getenv("OPENAI_BASE_URL"),
 		os.Getenv("OPENAI_API_KEY"),
+		"/v1",
 	)
+
+	// Example 2: Provider with BasePath (when BaseURL already includes /v1)
+	// For providers like SiliconFlow where the base URL is "https://api.siliconflow.cn/v1"
+	// you need to strip "/v1" from the endpoint to avoid duplication:
+	//
+	// siliconFlowProvider := provider.NewHTTPProviderWithBaseURLAndPath(
+	// 	os.Getenv("SILICONFLOW_BASE_URL"),  // e.g., "https://api.siliconflow.cn/v1"
+	// 	os.Getenv("SILICONFLOW_API_KEY"),
+	// 	"/v1",  // Strip /v1 from endpoint
+	// )
 
 	// Setup model registry with new API
 	registry := model.NewMapModelRegistry()
-	registry.RegisterWithOptions("gpt-4o", openAIProvider, model.WithModelRewrite("deepseek-ai/DeepSeek-V3.2"))
+	registry.RegisterWithOptions("gpt-4o", openAIProvider,
+		model.WithModelRewrite("deepseek-ai/DeepSeek-V3.2"),
+		model.WithPreferredAPI(provider.APITypeChatCompletions),
+	)
 	registry.Register("gpt-3.5-turbo", openAIProvider)
+
+	// Example: Register SiliconFlow models with BasePath
+	// siliconFlowProvider := provider.NewHTTPProviderWithBaseURLAndPath(
+	// 	"https://api.siliconflow.cn/v1",
+	// 	os.Getenv("SILICONFLOW_API_KEY"),
+	// 	"/v1",  // BasePath to strip from endpoint
+	// )
+	// registry.RegisterWithOptions("Qwen/Qwen2.5-7B-Instruct", siliconFlowProvider,
+	// 	model.WithPreferredAPI(provider.APITypeChatCompletions),
+	// )
 
 	// Create hooks
 	hooks := hook.NewRegistry()
-	hooks.Register(&LoggingHook{}, &AuthenticateHook{})
+	hooks.Register(&LoggingHook{}, &AuthenticateHook{}, &ErrorHook{})
 
 	// Create gateway
-	gw := gateway.New(
+	aigw := gateway.New(
 		gateway.WithModelRegistry(registry),
 		gateway.WithHooks(hooks),
 	)
 
 	// Start server
 	slog.Info("AI Gateway listening on :8083")
-	log.Fatal(http.ListenAndServe(":8083", gw))
+	log.Fatal(http.ListenAndServe(":8083", aigw))
 }
 
 type AuthenticateHook struct{}
@@ -88,3 +114,15 @@ func (h *LoggingHook) Name() string {
 }
 
 var _ hook.RequestHook = new(LoggingHook)
+
+type ErrorHook struct{}
+
+func (h *ErrorHook) Name() string {
+	return "error"
+}
+
+func (h *ErrorHook) OnError(ctx context.Context, err error) {
+	slog.ErrorContext(ctx, "[Hook] OnError", "error", err)
+}
+
+var _ hook.ErrorHook = new(ErrorHook)
