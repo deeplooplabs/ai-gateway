@@ -59,14 +59,15 @@ func main() {
 	hooks.Register(&LoggingHook{}, &AuthenticateHook{}, &ErrorHook{})
 
 	// Create gateway
-	aigw := gateway.New(
+	gw := gateway.New(
 		gateway.WithModelRegistry(registry),
 		gateway.WithHooks(hooks),
+		gateway.WithCORS(gateway.DefaultCORSConfig()),
 	)
 
 	// Start server
 	slog.Info("AI Gateway listening on :8083")
-	log.Fatal(http.ListenAndServe(":8083", aigw))
+	log.Fatal(http.ListenAndServe(":8083", gw))
 }
 
 type AuthenticateHook struct{}
