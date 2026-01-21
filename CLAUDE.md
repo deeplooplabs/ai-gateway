@@ -4,7 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**DeepLoop AI Gateway** is a programmable AI Gateway library written in Go that provides OpenAI API compatibility and aims to comply with the [OpenResponses specification](https://www.openresponses.org/). It is designed as an **embeddable library** (not a standalone service) that can be integrated into Go applications to provide unified access to multiple LLM providers.
+**DeepLoop AI Gateway** is a programmable AI Gateway library written in Go that provides **OpenAI API compatibility** and implements the [OpenResponses specification](https://www.openresponses.org/). It is designed as an **embeddable library** (not a standalone service) that can be integrated into Go applications to provide unified access to multiple LLM providers.
+
+### Key Design Principle
+
+The gateway supports **two API specifications simultaneously**:
+- **OpenAI API** (`/v1/chat/completions`, `/v1/embeddings`, `/v1/images/generations`)
+- **OpenResponses API** (`/v1/responses` with semantic streaming events)
 
 ## Development Commands
 
@@ -14,6 +20,7 @@ go test ./...
 
 # Run tests for specific package
 go test ./handler/...
+go test ./openresponses/...
 go test ./provider/...
 
 # Run tests with verbose output
@@ -45,7 +52,8 @@ go test -run TestChatHandler -v ./handler/
 ┌─────────────────────────────────────────┐
 │         Handler Layer                   │
 │  (handler/*.go)                         │
-│  - ChatHandler                          │
+│  - ChatHandler (OpenAI)                 │
+│  - ResponsesHandler (OpenResponses)     │
 │  - EmbeddingsHandler                    │
 │  - ImagesHandler                        │
 └─────────────────────────────────────────┘
@@ -72,25 +80,172 @@ go test -run TestChatHandler -v ./handler/
 │  - HTTPProvider (generic REST)          │
 │  - GeminiHTTPProvider                   │
 └─────────────────────────────────────────┘
+                  ↓
+┌─────────────────────────────────────────┐
+│      Conversion Layer                   │
+│  - openresponses/converter.go           │
+│  - provider/converter.go                │
+│  - Bidirectional OpenAI ↔ OR conversion │
+└─────────────────────────────────────────┘
 ```
 
 ### Key Packages
 
-- **`gateway/`**: Main HTTP handler implementing `http.Handler`. Routes requests to appropriate handlers. Options pattern for configuration.
-- **`handler/`**: HTTP handlers for each API endpoint (chat, embeddings, images). Handles authentication hooks, request parsing, and response assembly.
-- **`hook/`**: Extensible hook system with 4 hook types. Hooks are called at specific points in the request lifecycle.
-- **`model/`**: Model registry that maps model names to providers with optional model name rewriting (for provider-specific model names).
-- **`provider/`**: Abstract interface for LLM providers. Includes HTTP provider for REST APIs and Gemini-specific provider with type conversion.
+| Package | Purpose |
+|---------|---------|
+| `gateway/` | Main HTTP handler implementing `http.Handler`. Routes requests to appropriate handlers. |
+| `handler/` | HTTP handlers for each API endpoint (chat, responses, embeddings, images). |
+| `openresponses/` | **OpenResponses types** and streaming event implementation. |
+| `provider/` | Abstract interface for LLM providers with unified Request/Response types. |
+| `provider/openai/` | **OpenAI types** - canonical location for OpenAI API schemas. |
+| `hook/` | Extensible hook system with 4 hook types. |
+| `model/` | Model registry that maps model names to providers. |
+
+## OpenResponses Implementation
+
+### Endpoint
+
+The gateway implements `POST /v1/responses` as specified in [OpenResponses](https://www.openresponses.org/).
+
+### Request/Response Types
+
+All OpenResponses types are defined in `openresponses/types.go`:
+
+```go
+// Request
+type CreateRequest struct {
+    Model              string
+    Input              InputParam  // string or []MessageItemParam
+    PreviousResponseID string
+    Tools              []Tool
+    ToolChoice         ToolChoiceParam
+    Stream             *bool
+    Temperature        *float64
+    MaxOutputTokens    *int
+    Truncation         TruncationEnum
+    // ...
+}
+
+// Response
+type Response struct {
+    ID          string
+    Object      string  // "response"
+    Status      ResponseStatusEnum  // in_progress, completed, failed, incomplete
+    CreatedAt   int64
+    CompletedAt *int64
+    Model       string
+    Output      []ItemField  // MessageItem, FunctionCallItem, etc.
+    Usage       *Usage
+    Error       *Error
+    // ...
+}
+```
+
+### Streaming Events
+
+OpenResponses streaming uses **semantic events**, not raw deltas. All streaming events are defined in `openresponses/streaming.go`:
+
+**State Machine Events:**
+```go
+NewResponseCreatedEvent(sequence, responseID)
+NewResponseInProgressEvent(sequence)
+NewResponseCompletedEvent(sequence, response)
+NewResponseFailedEvent(sequence, errorType, message)
+NewResponseIncompleteEvent(sequence, details)
+```
+
+**Item Events:**
+```go
+NewResponseOutputItemAddedEvent(sequence, index, item)
+NewResponseOutputItemDoneEvent(sequence, index, item)
+```
+
+**Content Events:**
+```go
+NewResponseOutputTextDeltaEvent(sequence, itemID, outputIndex, contentIndex, delta)
+NewResponseOutputTextDoneEvent(sequence, itemID, outputIndex, contentIndex, text)
+NewResponseContentPartAddedEvent(sequence, itemID, outputIndex, contentIndex, content)
+```
+
+### Streaming Protocol
+
+- **Content-Type**: `text/event-stream`
+- **Termination**: Literal `[DONE]` marker
+- **Event field**: Matches `type` in event body
+- **Sequence number**: Required for ordering
+
+Example streaming events:
+```
+event: response.created
+data: {"type":"response.created","response_id":"resp_abc123",...}
+
+event: response.in_progress
+data: {"type":"response.in_progress","sequence_number":1}
+
+event: response.output_item.added
+data: {"type":"response.output_item.added","sequence_number":2,...}
+
+event: response.output_text.delta
+data: {"type":"response.output_text.delta","sequence_number":3,"delta":"Hello"}
+
+event: response.completed
+data: {"type":"response.completed","sequence_number":10,...}
+
+data: [DONE]
+```
+
+### Error Format
+
+OpenResponses errors follow this format:
+
+```json
+{
+  "error": {
+    "type": "invalid_request_error|server_error|not_found|model_error|too_many_requests",
+    "message": "Human-readable description",
+    "param": "optional_parameter_name",
+    "code": "optional_specific_code"
+  }
+}
+```
+
+Error implementations in `error.go`:
+- `NewValidationError()` → `invalid_request_error` (400)
+- `NewNotFoundError()` → `not_found` (404)
+- `NewAuthenticationError()` → `authentication_error` (401)
+- `NewRateLimitError()` → `rate_limit_error` (429)
+- `NewServerError()` → `server_error` (500)
+
+## OpenAI Compatibility
 
 ### OpenAI Types
 
-All OpenAI request/response types are defined in `provider/openai/types.go`. This is the canonical location for API schemas.
+All OpenAI request/response types are defined in `provider/openai/types.go`. This is the canonical location for OpenAI API schemas.
 
-### Streaming Implementation
+### Supported Endpoints
 
-Streaming uses Server-Sent Events (SSE). The provider returns a channel of `StreamChunk` which the handler processes and writes to the response in SSE format. Each chunk can be modified by `StreamingHook` implementations before being written.
+| Endpoint | Handler | Status |
+|----------|---------|--------|
+| `/v1/chat/completions` | `ChatHandler` | ✅ Full support |
+| `/v1/embeddings` | `EmbeddingsHandler` | ✅ Full support |
+| `/v1/images/generations` | `ImagesHandler` | ✅ Full support |
+| `/v1/responses` | `ResponsesHandler` | ✅ Full support (OpenResponses) |
 
-## Hook System Usage
+## Conversion Between Formats
+
+The gateway supports bidirectional conversion between OpenAI and OpenResponses formats:
+
+**Implemented in `openresponses/converter.go`:**
+- `RequestToChatCompletion()` - OR Request → OpenAI Request
+- `ChatCompletionToResponse()` - OpenAI Response → OR Response
+- `ResponseToChatCompletion()` - OR Response → OpenAI Response (reverse)
+- `StreamingChunkToEvents()` - OpenAI chunks → OR semantic events
+
+**Implemented in `provider/response.go`:**
+- `GetChatCompletion()` - Returns OpenAI format (converts from OR if needed)
+- `GetORResponse()` - Returns OR format (converts from OpenAI if needed)
+
+## Hook System
 
 Hooks are registered via `hook.NewRegistry()` and passed to gateway options:
 
@@ -105,161 +260,108 @@ gw := gateway.New(
 
 **Important**: Hook execution order is the order they were registered. Context values (like `tenant_id` from authentication) are available to downstream hooks via `context.Context`.
 
-## Adding a New Provider
+### Hook Types
 
-1. Implement the `provider.Provider` interface in `provider/`
-2. Optionally implement streaming by returning channels for `StreamChunk` and errors
-3. Register models with the provider in the model registry
+| Hook Type | Interface | Called When |
+|-----------|-----------|-------------|
+| `AuthenticationHook` | `Authenticate(ctx, apiKey) (success, tenantID, err)` | Before request processing |
+| `RequestHook` | `BeforeRequest(ctx, req)`, `AfterRequest(ctx, req, resp)` | Before/after provider call |
+| `StreamingHook` | `OnChunk(ctx, chunk) (modifiedChunk, err)` | For each streaming chunk |
+| `ErrorHook` | `OnError(ctx, err)` | On any error |
 
-## OpenResponses Specification Compliance
+## Provider Configuration
 
-This project aims to comply with the [OpenResponses specification](https://www.openresponses.org/specification). Reference: [OpenResponses GitHub](https://github.com/openresponses/openresponses), [OpenAPI Schema](https://www.openresponses.org/reference).
+### HTTP Provider
 
-### API Endpoint
+The `HTTPProvider` is a generic provider for OpenAI-compatible REST APIs:
 
-OpenResponses uses `POST /v1/responses` as the primary endpoint. This gateway currently implements OpenAI-compatible endpoints (`/v1/chat/completions`, `/v1/embeddings`, `/v1/images/generations`). Future work should consider adding the `/v1/responses` endpoint.
+```go
+// Basic configuration
+provider := provider.NewHTTPProviderWithBaseURL(
+    "https://api.openai.com/v1",
+    "your-api-key",
+)
 
-### Request Format
+// With BasePath (for APIs that include /v1 in base URL)
+provider := provider.NewHTTPProviderWithBaseURLAndPath(
+    "https://api.siliconflow.cn/v1",  // BaseURL includes /v1
+    "your-api-key",
+    "/v1",  // Strip /v1 from endpoint
+)
 
-OpenResponses requests use these key parameters:
+// Full configuration
+config := provider.NewProviderConfig("my-provider").
+    WithBaseURL("https://api.example.com/v1").
+    WithBasePath("/v1").  // Strip from endpoint before appending
+    WithAPIKey("your-key").
+    WithAPIType(provider.APITypeAll).  // Support both ChatCompletions and Responses
+    WithTimeout(30 * time.Second)
 
-| Parameter | Description |
-|-----------|-------------|
-| `model` | The model to use (e.g., 'gpt-4o') |
-| `input` | Context as string or array of items (UserMessageItemParam, SystemMessageItemParam, etc.) |
-| `previous_response_id` | ID of previous response for continuation |
-| `tools` | Array of available tools (FunctionToolParam) |
-| `tool_choice` | Controls tool usage: `none`, `auto`, `required`, or specific function |
-| `stream` | Enable SSE streaming |
-| `temperature`, `top_p` | Sampling parameters |
-| `max_output_tokens` | Maximum output tokens |
-| `truncation` | `auto` or `disabled` - context truncation behavior |
-| `instructions` | Additional instructions for the model |
-
-### Response Format
-
-OpenResponses responses include:
-
-| Field | Description |
-|-------|-------------|
-| `id` | Unique response ID |
-| `object` | Always "response" |
-| `status` | `in_progress`, `completed`, `failed`, `incomplete` |
-| `output` | Array of output items (Message, FunctionCall, Reasoning, etc.) |
-| `error` | Error object if failed |
-| `usage` | Token usage statistics |
-| `created_at`, `completed_at` | Unix timestamps |
-
-### Item Types
-
-OpenResponses defines these item types:
-
-| Type | Description |
-|------|-------------|
-| `message` | User/assistant/system/developer messages |
-| `function_call` | Function tool calls generated by model |
-| `function_call_output` | Results from function calls |
-| `reasoning` | Model's internal reasoning process |
-| Custom | Provider-specific types prefixed with slug (e.g., `openai:web_search_call`) |
-
-### Content Types
-
-**UserContent** (input to model):
-- `input_text` - Text input
-- `input_image` - Image input (URL or base64)
-- `input_file` - File input
-
-**ModelContent** (output from model):
-- `output_text` - Text output with optional annotations/logprobs
-- `refusal` - Model refusal response
-
-### Streaming Events
-
-OpenResponses streaming uses semantic events, not raw deltas. Event types include:
-
-**State Machine Events:**
-- `response.created` - Response initialized
-- `response.in_progress` - Response is being generated
-- `response.completed` - Response finished successfully
-- `response.failed` - Response encountered an error
-- `response.incomplete` - Response incomplete (token budget exhausted)
-
-**Item Events:**
-- `response.output_item.added` - New output item started
-- `response.output_item.done` - Item completed
-
-**Content Events:**
-- `response.content_part.added` - New content part started
-- `response.output_text.delta` - Text delta
-- `response.output_text.done` - Text part completed
-- `response.function_call_arguments.delta` - Function call delta
-- `response.function_call_arguments.done` - Function call completed
-
-**Reasoning Events:**
-- `response.reasoning.delta` - Reasoning content delta
-- `response.reasoning.done` - Reasoning completed
-- `response.reasoning_summary.delta` - Summary delta
-- `response.reasoning_summary.done` - Summary completed
-
-### Streaming Protocol Requirements
-
-- **MUST** use `Content-Type: text/event-stream`
-- **MUST** terminate with literal string `[DONE]`
-- **MUST** use `event` field matching `type` in event body
-- **SHOULD NOT** use `id` field in SSE events
-- Each event MUST include `sequence_number` for ordering
-
-Example streaming event:
-```
-event: response.output_text.delta
-data: {"type":"response.output_text.delta","sequence_number":10,"item_id":"msg_abc123","output_index":0,"content_index":0,"delta":"Hello"}
+provider := provider.NewHTTPProvider(config)
 ```
 
-### Error Response Format
+### Provider Interface
 
-Errors follow the OpenResponses schema:
+All providers implement the `Provider` interface:
 
-```json
-{
-  "error": {
-    "message": "Human-readable error description",
-    "type": "invalid_request_error|server_error|not_found|model_error|too_many_requests",
-    "code": "optional_specific_code",
-    "param": "optional_parameter_name"
-  }
+```go
+type Provider interface {
+    Name() string
+    SupportedAPIs() APIType
+    SendRequest(ctx context.Context, req *Request) (*Response, error)
 }
 ```
 
-Error types and HTTP status codes:
-| Type | Status Code | Description |
-|------|-------------|-------------|
-| `invalid_request_error` | 400 | Malformed or semantically invalid request |
-| `not_found` | 404 | Resource does not exist |
-| `too_many_requests` | 429 | Rate limit exceeded |
-| `server_error` | 500 | Internal server failure |
-| `model_error` | 500 | Model failed during processing |
+## Model Registry
 
-Current implementation in `handler/*.go` defines:
-- `invalid_request_error` (400)
-- `not_found_error` (404)
-- `api_error` (502) - should map to `server_error`
+The model registry maps model names to providers with optional transformations:
 
-### Extension Support
+```go
+registry := model.NewMapModelRegistry()
 
-Provider-specific extensions MUST follow naming conventions:
-- Item types: `{provider_slug}:{item_type}` (e.g., `openai:web_search_call`)
-- Streaming events: `{provider_slug}:{event_type}` (e.g., `acme:trace_event`)
+// Simple registration
+registry.Register("gpt-4", provider)
 
-### Migration Path
+// With model name rewrite (for provider-specific model names)
+registry.RegisterWithOptions("gpt-4", provider,
+    model.WithModelRewrite("deepseek-ai/DeepSeek-V3"),
+    model.WithPreferredAPI(provider.APITypeChatCompletions),
+)
 
-The current implementation uses OpenAI-compatible formats. To achieve full OpenResponses compliance:
+// Resolve returns (provider, rewrittenModelName)
+prov, modelName := registry.Resolve("gpt-4")
+```
 
-1. Add `/v1/responses` endpoint alongside existing OpenAI endpoints
-2. Implement OpenResponses request/response types in new package (e.g., `openresponses/`)
-3. Update streaming to use semantic events instead of OpenAI chunks
-4. Add support for `previous_response_id` for conversation continuation
-5. Implement reasoning item support
-6. Add proper tool_choice modes including `allowed_tools`
+## Streaming Implementation
+
+### OpenAI Streaming (SSE with raw deltas)
+
+```go
+// Provider returns chunks via channel
+for chunk := range resp.Chunks {
+    if chunk.Type == provider.ChunkTypeOpenAI {
+        // Raw OpenAI SSE chunk
+        data := chunk.OpenAI.Data
+    }
+}
+```
+
+### OpenResponses Streaming (semantic events)
+
+```go
+// Converter transforms OpenAI chunks to OR events
+events := converter.StreamingChunkToEvents(chunk.Data, &seq, itemID, outputIndex)
+for _, event := range events {
+    writer.WriteEvent(event)  // Writes proper SSE format
+}
+```
+
+## Adding a New Provider
+
+1. Implement the `provider.Provider` interface
+2. Optionally implement streaming by returning channels for `Chunk` and errors
+3. Register models with the provider in the model registry
+4. Use `provider.NewHTTPProvider()` for standard OpenAI-compatible APIs
 
 ## Testing Strategy
 
@@ -267,6 +369,7 @@ The current implementation uses OpenAI-compatible formats. To achieve full OpenR
 - Handler tests mock provider responses
 - Provider tests use recorded responses or test servers
 - Hook tests verify execution order and context propagation
+- Conversion tests verify bidirectional OpenAI ↔ OR conversion
 
 ## Configuration
 
