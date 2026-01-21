@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	ai_gateway "github.com/deeplooplabs/ai-gateway"
 	openai2 "github.com/deeplooplabs/ai-gateway/openresponses"
 	"github.com/deeplooplabs/ai-gateway/hook"
 	"github.com/deeplooplabs/ai-gateway/model"
@@ -43,12 +44,7 @@ func (h *ResponsesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// Only POST is supported
 	if r.Method != http.MethodPost {
-		h.writeError(w, r, openai2.NewError(
-			"invalid_request_error",
-			"method_not_allowed",
-			"Only POST method is allowed",
-			"",
-		))
+		h.writeError(w, r, ai_gateway.NewValidationError("Only POST method is allowed"))
 		return
 	}
 
@@ -57,21 +53,11 @@ func (h *ResponsesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	for _, hh := range h.hooks.AuthenticationHooks() {
 		success, tenantID, err := hh.Authenticate(ctx, r.Header.Get("Authorization"))
 		if err != nil {
-			h.writeError(w, r, openai2.NewError(
-				"server_error",
-				"authentication_failed",
-				"Authentication failed: "+err.Error(),
-				"",
-			))
+			h.writeError(w, r, ai_gateway.NewServerError("Authentication failed: "+err.Error(), err))
 			return
 		}
 		if !success {
-			h.writeError(w, r, openai2.NewError(
-				"invalid_request_error",
-				"unauthorized",
-				"Invalid API key",
-				"",
-			))
+			h.writeError(w, r, ai_gateway.NewAuthenticationError("Invalid API key"))
 			return
 		}
 		// Store tenantID in context
@@ -82,33 +68,18 @@ func (h *ResponsesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Parse request
 	var req openai2.CreateRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		h.writeError(w, r, openai2.NewError(
-			"invalid_request_error",
-			"invalid_json",
-			"Invalid request body: "+err.Error(),
-			"",
-		))
+		h.writeError(w, r, ai_gateway.NewValidationError("Invalid request body: "+err.Error()))
 		return
 	}
 
 	// Validate request
 	if req.Model == "" {
-		h.writeError(w, r, openai2.NewError(
-			"invalid_request_error",
-			"missing_model",
-			"model is required",
-			"model",
-		))
+		h.writeError(w, r, ai_gateway.NewValidationError("model is required"))
 		return
 	}
 
 	if req.Input == nil {
-		h.writeError(w, r, openai2.NewError(
-			"invalid_request_error",
-			"missing_input",
-			"input is required",
-			"input",
-		))
+		h.writeError(w, r, ai_gateway.NewValidationError("input is required"))
 		return
 	}
 
@@ -120,12 +91,7 @@ func (h *ResponsesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Resolve provider
 	prov, modelRewrite := h.registry.Resolve(req.Model)
 	if prov == nil {
-		h.writeError(w, r, openai2.NewError(
-			"invalid_request_error",
-			"model_not_found",
-			fmt.Sprintf("Model not found: %s", req.Model),
-			"model",
-		))
+		h.writeError(w, r, ai_gateway.NewNotFoundError(fmt.Sprintf("Model not found: %s", req.Model)))
 		return
 	}
 
@@ -151,12 +117,7 @@ func (h *ResponsesHandler) handleNonStream(ctx context.Context, w http.ResponseW
 	// Convert to OpenAI format
 	chatReq, err := h.converter.RequestToChatCompletion(req)
 	if err != nil {
-		h.writeError(w, r, openai2.NewError(
-			"invalid_request_error",
-			"conversion_error",
-			"Failed to convert request: "+err.Error(),
-			"",
-		))
+		h.writeError(w, r, ai_gateway.NewValidationError("Failed to convert request: "+err.Error()))
 		return
 	}
 
@@ -178,12 +139,7 @@ func (h *ResponsesHandler) handleNonStream(ctx context.Context, w http.ResponseW
 		// Note: We're using OpenAI types for existing hooks
 		// In the future, we'll have OpenResponses-specific hooks
 		if err := hh.BeforeRequest(ctx, chatReq); err != nil {
-			h.writeError(w, r, openai2.NewError(
-				"server_error",
-				"hook_error",
-				"BeforeRequest hook failed: "+err.Error(),
-				"",
-			))
+			h.writeError(w, r, ai_gateway.NewServerError("BeforeRequest hook failed: "+err.Error(), err))
 			return
 		}
 	}
@@ -191,12 +147,7 @@ func (h *ResponsesHandler) handleNonStream(ctx context.Context, w http.ResponseW
 	// Send request to provider using unified interface
 	resp, err := prov.SendRequest(ctx, unifiedReq)
 	if err != nil {
-		h.writeError(w, r, openai2.NewError(
-			"server_error",
-			"provider_error",
-			"Provider error: "+err.Error(),
-			"",
-		))
+		h.writeError(w, r, ai_gateway.NewServerError("Provider error: "+err.Error(), err))
 		return
 	}
 	defer resp.Close()
@@ -204,21 +155,11 @@ func (h *ResponsesHandler) handleNonStream(ctx context.Context, w http.ResponseW
 	// Convert response to OpenResponses format
 	chatResp, err := resp.GetChatCompletion()
 	if err != nil {
-		h.writeError(w, r, openai2.NewError(
-			"server_error",
-			"conversion_error",
-			"Failed to convert response: "+err.Error(),
-			"",
-		))
+		h.writeError(w, r, ai_gateway.NewServerError("Failed to convert response: "+err.Error(), err))
 		return
 	}
 	if chatResp == nil {
-		h.writeError(w, r, openai2.NewError(
-			"server_error",
-			"empty_response",
-			"Empty response from provider",
-			"",
-		))
+		h.writeError(w, r, ai_gateway.NewServerError("Empty response from provider", nil))
 		return
 	}
 
@@ -227,12 +168,7 @@ func (h *ResponsesHandler) handleNonStream(ctx context.Context, w http.ResponseW
 	// Write response
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(orResp); err != nil {
-		h.writeError(w, r, openai2.NewError(
-			"server_error",
-			"encode_error",
-			"Failed to encode response: "+err.Error(),
-			"",
-		))
+		h.writeError(w, r, ai_gateway.NewServerError("Failed to encode response: "+err.Error(), err))
 		return
 	}
 }
@@ -240,12 +176,7 @@ func (h *ResponsesHandler) handleNonStream(ctx context.Context, w http.ResponseW
 func (h *ResponsesHandler) handleStream(ctx context.Context, w http.ResponseWriter, r *http.Request, req *openai2.CreateRequest, prov provider.Provider) {
 	flusher, ok := w.(http.Flusher)
 	if !ok {
-		h.writeError(w, r, openai2.NewError(
-			"server_error",
-			"streaming_not_supported",
-			"Streaming not supported",
-			"",
-		))
+		h.writeError(w, r, ai_gateway.NewServerError("Streaming not supported", nil))
 		return
 	}
 
@@ -416,32 +347,24 @@ func (h *ResponsesHandler) handleStream(ctx context.Context, w http.ResponseWrit
 	}
 }
 
-func (h *ResponsesHandler) writeError(w http.ResponseWriter, r *http.Request, err *openai2.Error) {
+func (h *ResponsesHandler) writeError(w http.ResponseWriter, r *http.Request, err *ai_gateway.GatewayError) {
 	// Call ErrorHooks
 	ctx := r.Context()
 	for _, hh := range h.hooks.ErrorHooks() {
-		hh.OnError(ctx, fmt.Errorf("%s: %s", err.Type, err.Message))
+		hh.OnError(ctx, err)
 	}
 
-	// Set appropriate status code based on error type
-	var statusCode int
-	switch err.Type {
-	case "invalid_request_error":
-		statusCode = http.StatusBadRequest
-	case "model_not_found":
-		statusCode = http.StatusNotFound
-	case "unauthorized":
-		statusCode = http.StatusUnauthorized
-	default:
-		statusCode = http.StatusInternalServerError
-	}
-
+	// Use error's status code
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(statusCode)
+	w.WriteHeader(err.Code)
 
 	// OpenResponses error format
 	errorResp := map[string]any{
-		"error": err,
+		"error": map[string]any{
+			"type":    err.Type,
+			"message": err.Message,
+			"param":   err.Param,
+		},
 	}
 	json.NewEncoder(w).Encode(errorResp)
 }

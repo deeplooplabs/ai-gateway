@@ -275,3 +275,62 @@ func (c *Converter) getAccumulatedText(choice openai.Choice) string {
 func generateMessageID(responseID string, index int) string {
 	return fmt.Sprintf("msg_%s_%d", responseID, index)
 }
+
+// ResponseToChatCompletion converts an OpenResponses Response to an OpenAI ChatCompletionResponse
+func (c *Converter) ResponseToChatCompletion(orResp *Response) *openai.ChatCompletionResponse {
+	if orResp == nil || len(orResp.Output) == 0 {
+		return nil
+	}
+
+	choices := make([]openai.Choice, 0, len(orResp.Output))
+
+	for i, item := range orResp.Output {
+		if msgItem, ok := item.(*MessageItem); ok && msgItem.Role != "" {
+			// Extract content text from OutputTextContent
+			var content string
+			for _, c := range msgItem.Content {
+				if c.Type == "output_text" {
+					content += c.Text
+				}
+			}
+
+			// Map status to finish reason
+			finishReason := "stop"
+			if msgItem.Status == MessageStatusIncomplete {
+				finishReason = "length"
+			}
+
+			choices = append(choices, openai.Choice{
+				Index: i,
+				Message: openai.Message{
+					Role:    string(msgItem.Role),
+					Content: content,
+				},
+				FinishReason: finishReason,
+			})
+		}
+	}
+
+	if len(choices) == 0 {
+		return nil
+	}
+
+	chatResp := &openai.ChatCompletionResponse{
+		ID:      orResp.ID,
+		Object:  "chat.completion",
+		Created: orResp.CreatedAt,
+		Model:   orResp.Model,
+		Choices: choices,
+	}
+
+	// Convert usage
+	if orResp.Usage != nil {
+		chatResp.Usage = openai.Usage{
+			PromptTokens:     orResp.Usage.InputTokens,
+			CompletionTokens: orResp.Usage.OutputTokens,
+			TotalTokens:      orResp.Usage.TotalTokens,
+		}
+	}
+
+	return chatResp
+}

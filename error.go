@@ -70,7 +70,7 @@ func NewNotFoundError(message string) *GatewayError {
 	return &GatewayError{
 		Code:    http.StatusNotFound,
 		Message: message,
-		Type:    "invalid_request_error",
+		Type:    "not_found",
 	}
 }
 
@@ -89,6 +89,16 @@ func NewProviderError(message string, inner error) *GatewayError {
 		Code:       http.StatusBadGateway,
 		Message:    message,
 		Type:       "api_error",
+		InnerError: inner,
+	}
+}
+
+// NewServerError creates a new server error (500)
+func NewServerError(message string, inner error) *GatewayError {
+	return &GatewayError{
+		Code:       http.StatusInternalServerError,
+		Message:    message,
+		Type:       "server_error",
 		InnerError: inner,
 	}
 }

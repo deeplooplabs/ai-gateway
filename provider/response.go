@@ -1,6 +1,8 @@
 package provider
 
 import (
+	"fmt"
+
 	openai2 "github.com/deeplooplabs/ai-gateway/provider/openai"
 	openresponses "github.com/deeplooplabs/ai-gateway/openresponses"
 )
@@ -125,8 +127,15 @@ func (r *Response) GetChatCompletion() (*openai2.ChatCompletionResponse, error) 
 	if r.ChatCompletion != nil {
 		return r.ChatCompletion, nil
 	}
-	// TODO: Convert from ORResponse if needed
-	return nil, nil
+	if r.ORResponse != nil {
+		converter := openresponses.NewConverter()
+		chatResp := converter.ResponseToChatCompletion(r.ORResponse)
+		if chatResp == nil {
+			return nil, fmt.Errorf("failed to convert ORResponse to ChatCompletion")
+		}
+		return chatResp, nil
+	}
+	return nil, fmt.Errorf("no response data available")
 }
 
 // GetORResponse returns the OpenResponses response, converting from Chat Completions if needed
@@ -134,8 +143,11 @@ func (r *Response) GetORResponse(responseID string) (*openresponses.Response, er
 	if r.ORResponse != nil {
 		return r.ORResponse, nil
 	}
-	// TODO: Convert from ChatCompletion if needed
-	return nil, nil
+	if r.ChatCompletion != nil {
+		converter := openresponses.NewConverter()
+		return converter.ChatCompletionToResponse(r.ChatCompletion, responseID), nil
+	}
+	return nil, fmt.Errorf("no response data available")
 }
 
 // IsStreaming returns true if this is a streaming response
