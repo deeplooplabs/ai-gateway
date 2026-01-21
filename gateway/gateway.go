@@ -1,7 +1,10 @@
 package gateway
 
 import (
+	"fmt"
 	"net/http"
+	"strings"
+	"time"
 
 	"github.com/deeplooplabs/ai-gateway/handler"
 	"github.com/deeplooplabs/ai-gateway/hook"
@@ -13,6 +16,7 @@ type Gateway struct {
 	modelRegistry model.ModelRegistry
 	hooks         *hook.Registry
 	mux           *http.ServeMux
+	cors          *CORSConfig
 }
 
 // New creates a new gateway with default options
@@ -57,7 +61,95 @@ func (g *Gateway) setupRoutes() {
 
 // ServeHTTP implements http.Handler
 func (g *Gateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if g.cors != nil {
+		origin := r.Header.Get("Origin")
+
+		// Check if origin is allowed
+		if g.isOriginAllowed(origin) {
+			// Set CORS headers
+			if len(g.cors.AllowedOrigins) > 0 && g.cors.AllowedOrigins[0] == "*" {
+				w.Header().Set("Access-Control-Allow-Origin", "*")
+			} else if origin != "" {
+				w.Header().Set("Access-Control-Allow-Origin", origin)
+			}
+
+			// Handle preflight requests
+			if r.Method == http.MethodOptions {
+				g.handlePreflight(w, r)
+				w.WriteHeader(http.StatusNoContent)
+				return
+			}
+
+			// Set other CORS headers
+			if g.cors.AllowCredentials {
+				w.Header().Set("Access-Control-Allow-Credentials", "true")
+			}
+
+			if len(g.cors.ExposedHeaders) > 0 {
+				w.Header().Set("Access-Control-Expose-Headers", strings.Join(g.cors.ExposedHeaders, ", "))
+			}
+		}
+	}
+
 	g.mux.ServeHTTP(w, r)
+}
+
+// isOriginAllowed checks if the origin is allowed
+func (g *Gateway) isOriginAllowed(origin string) bool {
+	if len(g.cors.AllowedOrigins) == 0 {
+		return false
+	}
+
+	for _, allowed := range g.cors.AllowedOrigins {
+		if allowed == "*" {
+			return true
+		}
+		if allowed == origin {
+			return true
+		}
+	}
+
+	return origin == ""
+}
+
+// handlePreflight handles OPTIONS preflight requests
+func (g *Gateway) handlePreflight(w http.ResponseWriter, r *http.Request) {
+	// Set allowed methods
+	if len(g.cors.AllowedMethods) > 0 {
+		w.Header().Set("Access-Control-Allow-Methods", strings.Join(g.cors.AllowedMethods, ", "))
+	} else {
+		// If no methods specified, allow the requested method
+		if method := r.Header.Get("Access-Control-Request-Method"); method != "" {
+			w.Header().Set("Access-Control-Allow-Methods", method)
+		}
+	}
+
+	// Set allowed headers
+	if len(g.cors.AllowedHeaders) > 0 {
+		if g.cors.AllowedHeaders[0] == "*" {
+			// Echo back the requested headers
+			if headers := r.Header.Get("Access-Control-Request-Headers"); headers != "" {
+				w.Header().Set("Access-Control-Allow-Headers", headers)
+			}
+		} else {
+			w.Header().Set("Access-Control-Allow-Headers", strings.Join(g.cors.AllowedHeaders, ", "))
+		}
+	}
+
+	// Set max age
+	if g.cors.MaxAge > 0 {
+		w.Header().Set("Access-Control-Max-Age", formatDuration(g.cors.MaxAge))
+	}
+
+	// Set allow credentials
+	if g.cors.AllowCredentials {
+		w.Header().Set("Access-Control-Allow-Credentials", "true")
+	}
+}
+
+// formatDuration converts a duration to seconds for Max-Age header
+func formatDuration(d time.Duration) string {
+	return fmt.Sprintf("%.0f", d.Seconds())
 }
 
 func (g *Gateway) handleHealth(w http.ResponseWriter, r *http.Request) {
