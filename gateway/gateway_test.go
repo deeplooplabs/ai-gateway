@@ -66,7 +66,7 @@ func TestGateway_ServeHTTP_InvalidPath(t *testing.T) {
 func setupTestRegistry() model.ModelRegistry {
 	registry := model.NewMapModelRegistry()
 	mockProv := &mockProvider{}
-	registry.Register("gpt-4", mockProv, "")
+	registry.Register("gpt-4", mockProv)
 	return registry
 }
 
@@ -77,8 +77,13 @@ func (m *mockProvider) Name() string {
 	return "mock"
 }
 
-func (m *mockProvider) SendRequest(ctx context.Context, endpoint string, req *openai2.ChatCompletionRequest) (*openai2.ChatCompletionResponse, error) {
-	return &openai2.ChatCompletionResponse{
+func (m *mockProvider) SupportedAPIs() provider.APIType {
+	return provider.APITypeChatCompletions
+}
+
+func (m *mockProvider) SendRequest(ctx context.Context, req *provider.Request) (*provider.Response, error) {
+	// Return a mock Chat Completions response
+	chatResp := &openai2.ChatCompletionResponse{
 		ID:     "test-id",
 		Object: "chat.completion",
 		Model:  req.Model,
@@ -90,17 +95,8 @@ func (m *mockProvider) SendRequest(ctx context.Context, endpoint string, req *op
 			},
 			FinishReason: "stop",
 		}},
-	}, nil
-}
-
-func (m *mockProvider) SendRequestStream(ctx context.Context, endpoint string, req *openai2.ChatCompletionRequest) (<-chan openai2.StreamChunk, <-chan error) {
-	chunkChan := make(chan openai2.StreamChunk)
-	errChan := make(chan error, 1)
-	go func() {
-		defer close(chunkChan)
-		defer close(errChan)
-	}()
-	return chunkChan, errChan
+	}
+	return provider.NewChatCompletionResponse(chatResp), nil
 }
 
 // Ensure mockProvider implements the interface

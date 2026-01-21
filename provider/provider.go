@@ -2,16 +2,20 @@ package provider
 
 import (
 	"context"
-
-	openai2 "github.com/deeplooplabs/ai-gateway/provider/openai"
 )
 
-// Provider defines the interface for sending requests to LLM providers
+// Provider defines the unified interface for LLM providers
 type Provider interface {
 	// Name returns the provider name
 	Name() string
-	// SendRequest sends a non-streaming request and returns the response
-	SendRequest(ctx context.Context, endpoint string, req *openai2.ChatCompletionRequest) (*openai2.ChatCompletionResponse, error)
-	// SendRequestStream sends a streaming request and returns channels for chunks and errors
-	SendRequestStream(ctx context.Context, endpoint string, req *openai2.ChatCompletionRequest) (<-chan openai2.StreamChunk, <-chan error)
+
+	// SupportedAPIs returns the API type(s) this provider supports
+	SupportedAPIs() APIType
+
+	// SendRequest sends a request (streaming or non-streaming based on req.Stream)
+	// Returns a Response that can be either a complete response or a streaming channel
+	SendRequest(ctx context.Context, req *Request) (*Response, error)
 }
+
+// Ensure BaseProvider implements Provider
+var _ Provider = (*BaseProvider)(nil)

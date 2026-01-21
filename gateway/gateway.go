@@ -40,7 +40,11 @@ func New(opts ...Option) *Gateway {
 }
 
 func (g *Gateway) setupRoutes() {
-	// Chat Completions
+	// OpenResponses endpoint
+	responsesHandler := handler.NewResponsesHandler(g.modelRegistry, g.hooks)
+	g.mux.HandleFunc("/v1/responses", responsesHandler.ServeHTTP)
+
+	// Chat Completions (OpenAI-compatible)
 	chatHandler := handler.NewChatHandler(g.modelRegistry, g.hooks)
 	g.mux.HandleFunc("/v1/chat/completions", chatHandler.ServeHTTP)
 
