@@ -1,4 +1,4 @@
-package ai_gateway
+package aigateway
 
 import (
 	"net/http"
