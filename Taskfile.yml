@@ -1,8 +1,8 @@
 version: '3'
 
 env:
-  RELEASE_VERSION: v0.2.0
-  RELEASE_COMMENT: "v0.2.0: OpenResponses API"
+  RELEASE_VERSION: v0.2.2
+  RELEASE_COMMENT: "v0.2.2: OpenResponses API"
 
 tasks:
   release-tag:
