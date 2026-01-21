@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	openai2 "github.com/deeplooplabs/ai-gateway/provider/openai"
+	"github.com/deeplooplabs/ai-gateway/provider/openai"
 	openresponses "github.com/deeplooplabs/ai-gateway/openresponses"
 )
 
@@ -170,8 +170,8 @@ func (c *Converter) convertStreamingResponse(resp *Response, targetAPIType APITy
 }
 
 // responsesToChatCompletion converts an OpenResponses response to Chat Completions format
-func (c *Converter) responsesToChatCompletion(orResp *openresponses.Response) *openai2.ChatCompletionResponse {
-	choices := make([]openai2.Choice, 0, len(orResp.Output))
+func (c *Converter) responsesToChatCompletion(orResp *openresponses.Response) *openai.ChatCompletionResponse {
+	choices := make([]openai.Choice, 0, len(orResp.Output))
 
 	for _, item := range orResp.Output {
 		if msg, ok := item.(*openresponses.MessageItem); ok {
@@ -180,9 +180,9 @@ func (c *Converter) responsesToChatCompletion(orResp *openresponses.Response) *o
 				content += c.Text
 			}
 
-			choices = append(choices, openai2.Choice{
+			choices = append(choices, openai.Choice{
 				Index: len(choices),
-				Message: openai2.Message{
+				Message: openai.Message{
 					Role:    string(msg.Role),
 					Content: content,
 				},
@@ -191,14 +191,14 @@ func (c *Converter) responsesToChatCompletion(orResp *openresponses.Response) *o
 		}
 	}
 
-	usage := openai2.Usage{}
+	usage := openai.Usage{}
 	if orResp.Usage != nil {
 		usage.PromptTokens = orResp.Usage.InputTokens
 		usage.CompletionTokens = orResp.Usage.OutputTokens
 		usage.TotalTokens = orResp.Usage.TotalTokens
 	}
 
-	return &openai2.ChatCompletionResponse{
+	return &openai.ChatCompletionResponse{
 		ID:      orResp.ID,
 		Object:  "chat.completion",
 		Created: orResp.CreatedAt,
@@ -209,7 +209,7 @@ func (c *Converter) responsesToChatCompletion(orResp *openresponses.Response) *o
 }
 
 // chatCompletionToResponses converts a Chat Completions response to Responses format
-func (c *Converter) chatCompletionToResponses(chatResp *openai2.ChatCompletionResponse, responseID string) *openresponses.Response {
+func (c *Converter) chatCompletionToResponses(chatResp *openai.ChatCompletionResponse, responseID string) *openresponses.Response {
 	if responseID == "" {
 		responseID = "resp_" + chatResp.ID
 	}
@@ -253,14 +253,14 @@ func (c *Converter) orEventToOpenAIChunk(event openresponses.StreamingEvent) *Ch
 	switch e := event.(type) {
 	case *openresponses.ResponseOutputTextDeltaEvent:
 		// Create a ChatCompletionStreamResponse with the delta
-		chatResp := openai2.ChatCompletionStreamResponse{
+		chatResp := openai.ChatCompletionStreamResponse{
 			ID:      "chatcmpl-" + e.ItemID,
 			Object:  "chat.completion.chunk",
 			Model:   "",
 			Created: 0,
-			Choices: []openai2.Choice{
+			Choices: []openai.Choice{
 				{
-					Delta: &openai2.Delta{
+					Delta: &openai.Delta{
 						Content: e.Delta,
 					},
 				},
@@ -278,7 +278,7 @@ func (c *Converter) orEventToOpenAIChunk(event openresponses.StreamingEvent) *Ch
 }
 
 // openaiChunkToOREvent converts an OpenAI streaming chunk to OpenResponses event format
-func (c *Converter) openaiChunkToOREvent(chunk *openai2.StreamChunk) *Chunk {
+func (c *Converter) openaiChunkToOREvent(chunk *openai.StreamChunk) *Chunk {
 	if chunk.Done {
 		// Create a response.completed event
 		event := &openresponses.BaseStreamingEvent{
@@ -292,7 +292,7 @@ func (c *Converter) openaiChunkToOREvent(chunk *openai2.StreamChunk) *Chunk {
 		}
 	}
 
-	var chatResp openai2.ChatCompletionStreamResponse
+	var chatResp openai.ChatCompletionStreamResponse
 	if err := json.Unmarshal(chunk.Data, &chatResp); err != nil {
 		return nil
 	}

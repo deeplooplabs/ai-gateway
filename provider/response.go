@@ -3,7 +3,7 @@ package provider
 import (
 	"fmt"
 
-	openai2 "github.com/deeplooplabs/ai-gateway/provider/openai"
+	"github.com/deeplooplabs/ai-gateway/provider/openai"
 	openresponses "github.com/deeplooplabs/ai-gateway/openresponses"
 )
 
@@ -23,7 +23,7 @@ type Chunk struct {
 	Type ChunkType
 
 	// OpenAI format chunk
-	OpenAI *openai2.StreamChunk
+	OpenAI *openai.StreamChunk
 
 	// OpenResponses format event
 	OREvent openresponses.StreamingEvent
@@ -36,7 +36,7 @@ type Chunk struct {
 func NewOpenAIChunk(data []byte) *Chunk {
 	return &Chunk{
 		Type:  ChunkTypeOpenAI,
-		OpenAI: &openai2.StreamChunk{Data: data},
+		OpenAI: &openai.StreamChunk{Data: data},
 	}
 }
 
@@ -44,7 +44,7 @@ func NewOpenAIChunk(data []byte) *Chunk {
 func NewOpenAIChunkDone() *Chunk {
 	return &Chunk{
 		Type:  ChunkTypeOpenAI,
-		OpenAI: &openai2.StreamChunk{Done: true},
+		OpenAI: &openai.StreamChunk{Done: true},
 		Done:  true,
 	}
 }
@@ -68,7 +68,7 @@ type Response struct {
 	// === Non-streaming responses (when Stream=false) ===
 
 	// ChatCompletion is the OpenAI Chat Completions response
-	ChatCompletion *openai2.ChatCompletionResponse
+	ChatCompletion *openai.ChatCompletionResponse
 
 	// ORResponse is the OpenResponses response
 	ORResponse *openresponses.Response
@@ -86,7 +86,7 @@ type Response struct {
 }
 
 // NewChatCompletionResponse creates a new non-streaming Chat Completions response
-func NewChatCompletionResponse(resp *openai2.ChatCompletionResponse) *Response {
+func NewChatCompletionResponse(resp *openai.ChatCompletionResponse) *Response {
 	return &Response{
 		APIType:       APITypeChatCompletions,
 		Stream:        false,
@@ -123,7 +123,7 @@ func (r *Response) Close() error {
 }
 
 // GetChatCompletion returns the Chat Completions response, converting from Responses if needed
-func (r *Response) GetChatCompletion() (*openai2.ChatCompletionResponse, error) {
+func (r *Response) GetChatCompletion() (*openai.ChatCompletionResponse, error) {
 	if r.ChatCompletion != nil {
 		return r.ChatCompletion, nil
 	}

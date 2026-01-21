@@ -9,7 +9,7 @@ import (
 	"io"
 	"net/http"
 
-	openai2 "github.com/deeplooplabs/ai-gateway/provider/openai"
+	"github.com/deeplooplabs/ai-gateway/provider/openai"
 )
 
 // BaseProvider provides common functionality for all providers
@@ -121,7 +121,7 @@ func (p *BaseProvider) ConvertResponseIfNeeded(resp *Response, requestedAPIType 
 }
 
 // ParseChatCompletionRequest parses the unified request as a Chat Completions request
-func (p *BaseProvider) ParseChatCompletionRequest(req *Request) (*openai2.ChatCompletionRequest, error) {
+func (p *BaseProvider) ParseChatCompletionRequest(req *Request) (*openai.ChatCompletionRequest, error) {
 	return req.ToChatCompletionRequest()
 }
 
@@ -187,7 +187,7 @@ func (p *BaseProvider) sendNonStreamingRequest(ctx context.Context, url string, 
 		return nil, err
 	}
 
-	var chatResp openai2.ChatCompletionResponse
+	var chatResp openai.ChatCompletionResponse
 	if err := json.Unmarshal(respBody, &chatResp); err != nil {
 		return nil, fmt.Errorf("decode response: %w", err)
 	}
@@ -243,13 +243,13 @@ func (p *BaseProvider) sendStreamingRequest(ctx context.Context, url string, bod
 			}
 
 			// Check for [DONE]
-			if openai2.IsDoneMarker(line) {
+			if openai.IsDoneMarker(line) {
 				chunkChan <- NewOpenAIChunkDone()
 				return
 			}
 
 			// Extract data: content
-			_, data, isDone := openai2.ParseSSELine(line)
+			_, data, isDone := openai.ParseSSELine(line)
 			if isDone {
 				chunkChan <- NewOpenAIChunkDone()
 				return

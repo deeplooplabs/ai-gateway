@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	openai2 "github.com/deeplooplabs/ai-gateway/provider/openai"
+	"github.com/deeplooplabs/ai-gateway/provider/openai"
 	openresponses "github.com/deeplooplabs/ai-gateway/openresponses"
 )
 
@@ -25,7 +25,7 @@ type Request struct {
 	// === Chat Completions fields ===
 
 	// Messages is for Chat Completions format
-	Messages []openai2.Message
+	Messages []openai.Message
 
 	// === Responses fields ===
 
@@ -62,7 +62,7 @@ type Request struct {
 	FrequencyPenalty *float64
 
 	// Tools for function calling
-	Tools []openai2.Tool
+	Tools []openai.Tool
 
 	// ToolChoice controls tool calling behavior
 	ToolChoice any
@@ -75,7 +75,7 @@ type Request struct {
 }
 
 // NewChatCompletionsRequest creates a new request for Chat Completions API
-func NewChatCompletionsRequest(model string, messages []openai2.Message) *Request {
+func NewChatCompletionsRequest(model string, messages []openai.Message) *Request {
 	return &Request{
 		APIType:  APITypeChatCompletions,
 		Model:    model,
@@ -109,8 +109,8 @@ func (r *Request) SetMaxTokens(maxTokens *int) {
 }
 
 // ToChatCompletionRequest converts the unified request to OpenAI ChatCompletionRequest
-func (r *Request) ToChatCompletionRequest() (*openai2.ChatCompletionRequest, error) {
-	req := &openai2.ChatCompletionRequest{
+func (r *Request) ToChatCompletionRequest() (*openai.ChatCompletionRequest, error) {
+	req := &openai.ChatCompletionRequest{
 		Model:            r.Model,
 		Messages:         r.Messages,
 		Temperature:      r.Temperature,
@@ -174,10 +174,10 @@ func (r *Request) Clone() (*Request, error) {
 }
 
 // InputToMessages converts Responses Input to Chat Completions Messages
-func (r *Request) InputToMessages() ([]openai2.Message, error) {
+func (r *Request) InputToMessages() ([]openai.Message, error) {
 	// If input is a string, treat it as a user message
 	if str, ok := r.Input.(string); ok {
-		return []openai2.Message{{Role: "user", Content: str}}, nil
+		return []openai.Message{{Role: "user", Content: str}}, nil
 	}
 
 	// If input is already a JSON array (unmarshaled as []interface{})
@@ -215,12 +215,12 @@ func (r *Request) InputToMessages() ([]openai2.Message, error) {
 	}
 
 	// Treat as single user message
-	return []openai2.Message{{Role: "user", Content: string(data)}}, nil
+	return []openai.Message{{Role: "user", Content: string(data)}}, nil
 }
 
 // messagesFromItems extracts messages from input items
-func messagesFromItems(items []interface{}) ([]openai2.Message, error) {
-	var messages []openai2.Message
+func messagesFromItems(items []interface{}) ([]openai.Message, error) {
+	var messages []openai.Message
 
 	for _, item := range items {
 		// Try to convert item to map
@@ -246,7 +246,7 @@ func messagesFromItems(items []interface{}) ([]openai2.Message, error) {
 			if contentVal, ok := itemMap["content"]; ok {
 				content = fmt.Sprintf("%v", contentVal)
 			}
-			messages = append(messages, openai2.Message{
+			messages = append(messages, openai.Message{
 				Role:    role,
 				Content: content,
 			})
@@ -255,7 +255,7 @@ func messagesFromItems(items []interface{}) ([]openai2.Message, error) {
 
 	if len(messages) == 0 {
 		// Fallback: no valid messages found
-		return []openai2.Message{{Role: "user", Content: ""}}, nil
+		return []openai.Message{{Role: "user", Content: ""}}, nil
 	}
 
 	return messages, nil
