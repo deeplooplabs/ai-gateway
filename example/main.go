@@ -17,13 +17,16 @@ import (
 )
 
 func main() {
-	// Create providers
-	openAIProvider := provider.NewHTTPProvider(os.Getenv("OPENAI_BASE_URL"), os.Getenv("OPENAI_API_KEY"))
+	// Create providers using the new API
+	openAIProvider := provider.NewHTTPProviderWithBaseURL(
+		os.Getenv("OPENAI_BASE_URL"),
+		os.Getenv("OPENAI_API_KEY"),
+	)
 
-	// Setup model registry
+	// Setup model registry with new API
 	registry := model.NewMapModelRegistry()
-	registry.Register("gpt-4o", openAIProvider, "deepseek-ai/DeepSeek-V3.2")
-	registry.Register("gpt-3.5-turbo", openAIProvider, "")
+	registry.RegisterWithOptions("gpt-4o", openAIProvider, model.WithModelRewrite("deepseek-ai/DeepSeek-V3.2"))
+	registry.Register("gpt-3.5-turbo", openAIProvider)
 
 	// Create hooks
 	hooks := hook.NewRegistry()

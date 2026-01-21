@@ -25,17 +25,24 @@ data: [DONE]
 	}))
 	defer server.Close()
 
-	provider := NewHTTPProvider(server.URL, "test-key")
+	provider := NewHTTPProviderWithBaseURL(server.URL, "test-key")
 
-	req := &openai2.ChatCompletionRequest{
-		Model:    "gpt-4",
-		Messages: []openai2.Message{{Role: "user", Content: "test"}},
+	req := NewChatCompletionsRequest("gpt-4", []openai2.Message{{Role: "user", Content: "test"}})
+	req.Stream = true
+	req.Endpoint = "/v1/chat/completions"
+
+	resp, err := provider.SendRequest(context.Background(), req)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	defer resp.Close()
+
+	if !resp.Stream {
+		t.Fatal("expected streaming response")
 	}
 
-	chunkChan, errChan := provider.SendRequestStream(context.Background(), "/v1/chat/completions", req)
-
-	chunks := []openai2.StreamChunk{}
-	for chunk := range chunkChan {
+	chunks := []*Chunk{}
+	for chunk := range resp.Chunks {
 		chunks = append(chunks, chunk)
 		if chunk.Done {
 			break
@@ -52,7 +59,12 @@ data: [DONE]
 
 	// Check no error - the channel should be closed with no error sent
 	// When closed, reading returns nil (zero value for error)
-	if err := <-errChan; err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	select {
+	case err := <-resp.Errors:
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	default:
+		// No error
 	}
 }

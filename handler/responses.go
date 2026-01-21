@@ -12,14 +12,7 @@ import (
 	"github.com/deeplooplabs/ai-gateway/hook"
 	"github.com/deeplooplabs/ai-gateway/model"
 	"github.com/deeplooplabs/ai-gateway/provider"
-	openai "github.com/deeplooplabs/ai-gateway/provider/openai"
 )
-
-// ORStreamingProvider is the provider interface for OpenResponses streaming requests
-type ORStreamingProvider interface {
-	provider.Provider
-	SendRequestStream(ctx context.Context, endpoint string, req *openai.ChatCompletionRequest) (<-chan openai.StreamChunk, <-chan error)
-}
 
 // ResponsesHandler handles OpenResponses API requests
 type ResponsesHandler struct {
@@ -167,6 +160,19 @@ func (h *ResponsesHandler) handleNonStream(ctx context.Context, w http.ResponseW
 		return
 	}
 
+	// Build unified request
+	unifiedReq := provider.NewChatCompletionsRequest(chatReq.Model, chatReq.Messages)
+	unifiedReq.Stream = false
+	unifiedReq.Temperature = chatReq.Temperature
+	unifiedReq.TopP = chatReq.TopP
+	unifiedReq.MaxTokens = chatReq.MaxTokens
+	unifiedReq.Stop = chatReq.Stop
+	unifiedReq.PresencePenalty = chatReq.PresencePenalty
+	unifiedReq.FrequencyPenalty = chatReq.FrequencyPenalty
+	unifiedReq.Tools = chatReq.Tools
+	unifiedReq.ToolChoice = chatReq.ToolChoice
+	unifiedReq.Endpoint = "/v1/chat/completions"
+
 	// Call BeforeRequest hooks
 	for _, hh := range h.hooks.RequestHooks() {
 		// Note: We're using OpenAI types for existing hooks
@@ -182,8 +188,8 @@ func (h *ResponsesHandler) handleNonStream(ctx context.Context, w http.ResponseW
 		}
 	}
 
-	// Send request to provider
-	resp, err := prov.SendRequest(ctx, "/v1/chat/completions", chatReq)
+	// Send request to provider using unified interface
+	resp, err := prov.SendRequest(ctx, unifiedReq)
 	if err != nil {
 		h.writeError(w, r, openai2.NewError(
 			"server_error",
@@ -193,9 +199,30 @@ func (h *ResponsesHandler) handleNonStream(ctx context.Context, w http.ResponseW
 		))
 		return
 	}
+	defer resp.Close()
 
 	// Convert response to OpenResponses format
-	orResp := h.converter.ChatCompletionToResponse(resp, responseID)
+	chatResp, err := resp.GetChatCompletion()
+	if err != nil {
+		h.writeError(w, r, openai2.NewError(
+			"server_error",
+			"conversion_error",
+			"Failed to convert response: "+err.Error(),
+			"",
+		))
+		return
+	}
+	if chatResp == nil {
+		h.writeError(w, r, openai2.NewError(
+			"server_error",
+			"empty_response",
+			"Empty response from provider",
+			"",
+		))
+		return
+	}
+
+	orResp := h.converter.ChatCompletionToResponse(chatResp, responseID)
 
 	// Write response
 	w.Header().Set("Content-Type", "application/json")
@@ -217,20 +244,6 @@ func (h *ResponsesHandler) handleStream(ctx context.Context, w http.ResponseWrit
 			"server_error",
 			"streaming_not_supported",
 			"Streaming not supported",
-			"",
-		))
-		return
-	}
-
-	// Check if provider supports streaming
-	streamingProvider, ok := prov.(interface {
-		SendRequestStream(context.Context, string, *openai.ChatCompletionRequest) (<-chan openai.StreamChunk, <-chan error)
-	})
-	if !ok {
-		h.writeError(w, r, openai2.NewError(
-			"invalid_request_error",
-			"streaming_not_supported",
-			"Provider does not support streaming",
 			"",
 		))
 		return
@@ -265,8 +278,41 @@ func (h *ResponsesHandler) handleStream(ctx context.Context, w http.ResponseWrit
 		return
 	}
 
-	// Get streaming channels from provider
-	chunkChan, errChan := streamingProvider.SendRequestStream(ctx, "/v1/chat/completions", chatReq)
+	// Build unified request
+	unifiedReq := provider.NewChatCompletionsRequest(chatReq.Model, chatReq.Messages)
+	unifiedReq.Stream = true
+	unifiedReq.Temperature = chatReq.Temperature
+	unifiedReq.TopP = chatReq.TopP
+	unifiedReq.MaxTokens = chatReq.MaxTokens
+	unifiedReq.Stop = chatReq.Stop
+	unifiedReq.PresencePenalty = chatReq.PresencePenalty
+	unifiedReq.FrequencyPenalty = chatReq.FrequencyPenalty
+	unifiedReq.Tools = chatReq.Tools
+	unifiedReq.ToolChoice = chatReq.ToolChoice
+	unifiedReq.Endpoint = "/v1/chat/completions"
+
+	// Send request to provider using unified interface
+	resp, err := prov.SendRequest(ctx, unifiedReq)
+	if err != nil {
+		writer.WriteError(openai2.NewError(
+			"server_error",
+			"provider_error",
+			"Provider error: "+err.Error(),
+			"",
+		))
+		return
+	}
+	defer resp.Close()
+
+	if !resp.Stream {
+		writer.WriteError(openai2.NewError(
+			"server_error",
+			"not_streaming",
+			"Provider returned non-streaming response",
+			"",
+		))
+		return
+	}
 
 	// Track state for item management
 	seq := 0
@@ -279,25 +325,25 @@ func (h *ResponsesHandler) handleStream(ctx context.Context, w http.ResponseWrit
 		select {
 		case <-ctx.Done():
 			return
-		case chunk, ok := <-chunkChan:
+		case chunk, ok := <-resp.Chunks:
 			if !ok {
 				// Channel closed, send completion
-				resp := openai2.NewResponse(responseID, req.Model)
-				resp.Status = openai2.ResponseStatusCompleted
+				orResp := openai2.NewResponse(responseID, req.Model)
+				orResp.Status = openai2.ResponseStatusCompleted
 				now := time.Now().Unix()
-				resp.CompletedAt = &now
+				orResp.CompletedAt = &now
 
-				writer.WriteEvent(openai2.NewResponseCompletedEvent(writer.NextSequence(), resp))
+				writer.WriteEvent(openai2.NewResponseCompletedEvent(writer.NextSequence(), orResp))
 				writer.WriteDone()
 				return
 			}
 
 			if chunk.Done {
 				// Send completion
-				resp := openai2.NewResponse(responseID, req.Model)
-				resp.Status = openai2.ResponseStatusCompleted
+				orResp := openai2.NewResponse(responseID, req.Model)
+				orResp.Status = openai2.ResponseStatusCompleted
 				now := time.Now().Unix()
-				resp.CompletedAt = &now
+				orResp.CompletedAt = &now
 
 				// Add completed message item if we haven't already
 				if !itemAdded {
@@ -310,15 +356,16 @@ func (h *ResponsesHandler) handleStream(ctx context.Context, w http.ResponseWrit
 							{Type: "output_text", Text: ""},
 						},
 					}
-					resp.Output = []openai2.ItemField{messageItem}
+					orResp.Output = []openai2.ItemField{messageItem}
 				}
 
-				writer.WriteEvent(openai2.NewResponseCompletedEvent(writer.NextSequence(), resp))
+				writer.WriteEvent(openai2.NewResponseCompletedEvent(writer.NextSequence(), orResp))
 				writer.WriteDone()
 				return
 			}
 
-			if len(chunk.Data) > 0 {
+			// Process chunk based on type
+			if chunk.Type == provider.ChunkTypeOpenAI && chunk.OpenAI != nil && len(chunk.OpenAI.Data) > 0 {
 				// Send item added event if not sent yet
 				if !itemAdded {
 					messageItem := &openai2.MessageItem{
@@ -339,13 +386,10 @@ func (h *ResponsesHandler) handleStream(ctx context.Context, w http.ResponseWrit
 				}
 
 				// Convert chunk to events
-				events := h.converter.StreamingChunkToEvents(chunk.Data, &seq, itemID, outputIndex)
+				events := h.converter.StreamingChunkToEvents(chunk.OpenAI.Data, &seq, itemID, outputIndex)
 
 				// Apply streaming hooks and write events
 				for _, event := range events {
-					// Apply streaming hooks (for existing hooks, we skip for now)
-					// In the future, we'll have OpenResponses-specific streaming hooks
-
 					if err := writer.WriteEvent(event); err != nil {
 						writer.WriteError(openai2.NewError(
 							"server_error",
@@ -358,7 +402,7 @@ func (h *ResponsesHandler) handleStream(ctx context.Context, w http.ResponseWrit
 				}
 			}
 
-		case err := <-errChan:
+		case err := <-resp.Errors:
 			if err != nil {
 				writer.WriteError(openai2.NewError(
 					"server_error",
@@ -400,10 +444,4 @@ func (h *ResponsesHandler) writeError(w http.ResponseWriter, r *http.Request, er
 		"error": err,
 	}
 	json.NewEncoder(w).Encode(errorResp)
-}
-
-// Import the StreamChunk type from provider
-// We need to add this to the openresponses package
-func init() {
-	// Register any initialization logic here
 }

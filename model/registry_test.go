@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/deeplooplabs/ai-gateway/provider"
-	openai2 "github.com/deeplooplabs/ai-gateway/provider/openai"
 )
 
 func TestMapModelRegistry(t *testing.T) {
@@ -17,10 +16,10 @@ func TestMapModelRegistry(t *testing.T) {
 
 	registry := NewMapModelRegistry()
 
-	// Register models
-	registry.Register("gpt-4", prov1, "")
-	registry.Register("gpt-3.5-turbo", prov2, "gpt-35-turbo")
-	registry.Register("claude-3", prov1, "")
+	// Register models using new API
+	registry.Register("gpt-4", prov1)
+	registry.RegisterWithOptions("gpt-3.5-turbo", prov2, WithModelRewrite("gpt-35-turbo"))
+	registry.Register("claude-3", prov1)
 
 	// Test exact match
 	p, modelRewrite := registry.Resolve("gpt-4")
@@ -55,25 +54,19 @@ func (m *mockProvider) Name() string {
 	return m.name
 }
 
-func (m *mockProvider) SendRequest(ctx context.Context, endpoint string, req *openai2.ChatCompletionRequest) (*openai2.ChatCompletionResponse, error) {
-	return nil, nil
+func (m *mockProvider) SupportedAPIs() provider.APIType {
+	return provider.APITypeChatCompletions
 }
 
-func (m *mockProvider) SendRequestStream(ctx context.Context, endpoint string, req *openai2.ChatCompletionRequest) (<-chan openai2.StreamChunk, <-chan error) {
-	chunkChan := make(chan openai2.StreamChunk)
-	errChan := make(chan error, 1)
-	go func() {
-		defer close(chunkChan)
-		defer close(errChan)
-	}()
-	return chunkChan, errChan
+func (m *mockProvider) SendRequest(ctx context.Context, req *provider.Request) (*provider.Response, error) {
+	return nil, nil
 }
 
 func TestMapModelRegistry_GeminiProvider(t *testing.T) {
 	registry := NewMapModelRegistry()
 
 	mockProvider := &mockProvider{name: "test-gemini"}
-	registry.Register("gemini-pro", mockProvider, "gemini-2.0-flash-exp")
+	registry.RegisterWithOptions("gemini-pro", mockProvider, WithModelRewrite("gemini-2.0-flash-exp"))
 
 	prov, rewrite := registry.Resolve("gemini-pro")
 
@@ -85,5 +78,27 @@ func TestMapModelRegistry_GeminiProvider(t *testing.T) {
 	}
 	if rewrite != "gemini-2.0-flash-exp" {
 		t.Errorf("expected rewrite 'gemini-2.0-flash-exp', got '%s'", rewrite)
+	}
+}
+
+func TestMapModelRegistry_ResolveWithAPI(t *testing.T) {
+	registry := NewMapModelRegistry()
+
+	prov1 := &mockProvider{name: "provider1"}
+
+	// Register with preferred API type
+	registry.RegisterWithOptions("gpt-4", prov1, WithPreferredAPI(provider.APITypeResponses))
+
+	// Test ResolveWithAPI
+	p, _, apiType := registry.ResolveWithAPI("gpt-4")
+
+	if p == nil {
+		t.Fatal("expected non-nil provider")
+	}
+	if p.Name() != "provider1" {
+		t.Errorf("expected provider name 'provider1', got '%s'", p.Name())
+	}
+	if apiType != provider.APITypeResponses {
+		t.Errorf("expected APITypeResponses, got '%v'", apiType)
 	}
 }
