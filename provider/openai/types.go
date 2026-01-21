@@ -39,6 +39,8 @@ type ChatCompletionRequest struct {
 	Stop             any       `json:"stop,omitempty"`
 	PresencePenalty  *float64  `json:"presence_penalty,omitempty"`
 	FrequencyPenalty *float64  `json:"frequency_penalty,omitempty"`
+	Tools            []Tool    `json:"tools,omitempty"`
+	ToolChoice       any       `json:"tool_choice,omitempty"`
 }
 
 // ChatCompletionResponse represents a chat completion response
@@ -105,3 +107,29 @@ type Image struct {
 	B64JSON       string `json:"b64_json,omitempty"` // For DALL-E 3
 	RevisedPrompt string `json:"revised_prompt,omitempty"`
 }
+
+// Tool represents a tool that can be called by the model
+type Tool struct {
+	Type     string             `json:"type"`     // "function"
+	Function FunctionDefinition `json:"function"`
+}
+
+// FunctionDefinition defines a function tool
+type FunctionDefinition struct {
+	Name        string         `json:"name"`
+	Description string         `json:"description,omitempty"`
+	Parameters  map[string]any `json:"parameters,omitempty"`
+}
+
+// ToolCall represents a tool call in a response
+type ToolCall struct {
+	ID       string `json:"id,omitempty"`
+	Type     string `json:"type"` // "function"
+	Function struct {
+		Name      string `json:"name"`
+		Arguments string `json:"arguments"`
+	} `json:"function"`
+}
+
+// ToolCallChoice controls tool calling behavior
+type ToolCallChoice any // Can be "none", "auto", or a specific object
