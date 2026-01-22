@@ -52,6 +52,9 @@ type Request struct {
 	// MaxOutputTokens is the maximum output tokens (Responses API naming)
 	MaxOutputTokens *int
 
+	// MaxCompletionTokens is the maximum completion tokens (for reasoning models)
+	MaxCompletionTokens *int
+
 	// Stop sequences
 	Stop any
 
@@ -66,6 +69,29 @@ type Request struct {
 
 	// ToolChoice controls tool calling behavior
 	ToolChoice any
+
+	// === Additional OpenAI API parameters ===
+
+	// StreamOptions controls streaming behavior
+	StreamOptions *openai.StreamOptions
+
+	// ResponseFormat specifies the output format (e.g., JSON schema)
+	ResponseFormat *openai.ResponseFormat
+
+	// ServiceTier specifies the processing tier
+	ServiceTier string
+
+	// LogProbs configures log probability output
+	LogProbs *openai.LogProbsOption
+
+	// Seed for deterministic sampling
+	Seed *int
+
+	// Metadata for storing additional information
+	Metadata map[string]any
+
+	// User identifier for the request
+	User string
 
 	// Original request body for passthrough
 	OriginalBody []byte
@@ -111,17 +137,25 @@ func (r *Request) SetMaxTokens(maxTokens *int) {
 // ToChatCompletionRequest converts the unified request to OpenAI ChatCompletionRequest
 func (r *Request) ToChatCompletionRequest() (*openai.ChatCompletionRequest, error) {
 	req := &openai.ChatCompletionRequest{
-		Model:            r.Model,
-		Messages:         r.Messages,
-		Temperature:      r.Temperature,
-		TopP:             r.TopP,
-		MaxTokens:        r.GetMaxTokens(),
-		Stop:             r.Stop,
-		PresencePenalty:  r.PresencePenalty,
-		FrequencyPenalty: r.FrequencyPenalty,
-		Tools:            r.Tools,
-		ToolChoice:       r.ToolChoice,
-		Stream:           r.Stream,
+		Model:                r.Model,
+		Messages:             r.Messages,
+		Temperature:          r.Temperature,
+		TopP:                 r.TopP,
+		MaxTokens:            r.GetMaxTokens(),
+		MaxCompletionTokens:  r.MaxCompletionTokens,
+		Stop:                 r.Stop,
+		PresencePenalty:      r.PresencePenalty,
+		FrequencyPenalty:     r.FrequencyPenalty,
+		Tools:                r.Tools,
+		ToolChoice:           r.ToolChoice,
+		Stream:               r.Stream,
+		StreamOptions:        r.StreamOptions,
+		ResponseFormat:       r.ResponseFormat,
+		ServiceTier:          r.ServiceTier,
+		LogProbs:             r.LogProbs,
+		Seed:                 r.Seed,
+		Metadata:             r.Metadata,
+		User:                 r.User,
 	}
 	return req, nil
 }

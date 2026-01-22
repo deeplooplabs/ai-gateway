@@ -10,7 +10,7 @@ import (
 	"github.com/deeplooplabs/ai-gateway/hook"
 	"github.com/deeplooplabs/ai-gateway/model"
 	"github.com/deeplooplabs/ai-gateway/provider"
-	openai2 "github.com/deeplooplabs/ai-gateway/provider/openai"
+	"github.com/deeplooplabs/ai-gateway/provider/openai"
 )
 
 // ChatHandler handles chat completion requests
@@ -49,7 +49,7 @@ func (h *ChatHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Parse request
-	var req openai2.ChatCompletionRequest
+	var req openai.ChatCompletionRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		h.writeError(w, r, NewValidationError("invalid request body: "+err.Error()))
 		return
@@ -87,18 +87,26 @@ func (h *ChatHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	h.handleNonStream(w, r, &req, prov)
 }
 
-func (h *ChatHandler) handleNonStream(w http.ResponseWriter, r *http.Request, req *openai2.ChatCompletionRequest, prov provider.Provider) {
+func (h *ChatHandler) handleNonStream(w http.ResponseWriter, r *http.Request, req *openai.ChatCompletionRequest, prov provider.Provider) {
 	// Build unified request
 	unifiedReq := provider.NewChatCompletionsRequest(req.Model, req.Messages)
 	unifiedReq.Stream = false
 	unifiedReq.Temperature = req.Temperature
 	unifiedReq.TopP = req.TopP
 	unifiedReq.MaxTokens = req.MaxTokens
+	unifiedReq.MaxCompletionTokens = req.MaxCompletionTokens
 	unifiedReq.Stop = req.Stop
 	unifiedReq.PresencePenalty = req.PresencePenalty
 	unifiedReq.FrequencyPenalty = req.FrequencyPenalty
 	unifiedReq.Tools = req.Tools
 	unifiedReq.ToolChoice = req.ToolChoice
+	unifiedReq.StreamOptions = req.StreamOptions
+	unifiedReq.ResponseFormat = req.ResponseFormat
+	unifiedReq.ServiceTier = req.ServiceTier
+	unifiedReq.LogProbs = req.LogProbs
+	unifiedReq.Seed = req.Seed
+	unifiedReq.Metadata = req.Metadata
+	unifiedReq.User = req.User
 	unifiedReq.Endpoint = "/v1/chat/completions"
 
 	// Call BeforeRequest hooks
@@ -144,7 +152,7 @@ func (h *ChatHandler) handleNonStream(w http.ResponseWriter, r *http.Request, re
 	}
 }
 
-func (h *ChatHandler) handleStream(w http.ResponseWriter, r *http.Request, req *openai2.ChatCompletionRequest, prov provider.Provider) {
+func (h *ChatHandler) handleStream(w http.ResponseWriter, r *http.Request, req *openai.ChatCompletionRequest, prov provider.Provider) {
 	flusher, ok := w.(http.Flusher)
 	if !ok {
 		h.writeError(w, r, NewValidationError("streaming not supported"))
@@ -161,11 +169,19 @@ func (h *ChatHandler) handleStream(w http.ResponseWriter, r *http.Request, req *
 	unifiedReq.Temperature = req.Temperature
 	unifiedReq.TopP = req.TopP
 	unifiedReq.MaxTokens = req.MaxTokens
+	unifiedReq.MaxCompletionTokens = req.MaxCompletionTokens
 	unifiedReq.Stop = req.Stop
 	unifiedReq.PresencePenalty = req.PresencePenalty
 	unifiedReq.FrequencyPenalty = req.FrequencyPenalty
 	unifiedReq.Tools = req.Tools
 	unifiedReq.ToolChoice = req.ToolChoice
+	unifiedReq.StreamOptions = req.StreamOptions
+	unifiedReq.ResponseFormat = req.ResponseFormat
+	unifiedReq.ServiceTier = req.ServiceTier
+	unifiedReq.LogProbs = req.LogProbs
+	unifiedReq.Seed = req.Seed
+	unifiedReq.Metadata = req.Metadata
+	unifiedReq.User = req.User
 	unifiedReq.Endpoint = "/v1/chat/completions"
 
 	// Send request to provider using unified interface
