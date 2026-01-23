@@ -6,9 +6,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/deeplooplabs/ai-gateway/cache"
 	"github.com/deeplooplabs/ai-gateway/handler"
 	"github.com/deeplooplabs/ai-gateway/hook"
 	"github.com/deeplooplabs/ai-gateway/model"
+	"github.com/deeplooplabs/ai-gateway/ratelimit"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 // Gateway is the main HTTP handler
@@ -17,6 +20,9 @@ type Gateway struct {
 	hooks         *hook.Registry
 	mux           *http.ServeMux
 	cors          *CORSConfig
+	metrics       *Metrics
+	cache         cache.Cache
+	rateLimiter   ratelimit.Limiter
 }
 
 // New creates a new gateway with default options
@@ -58,6 +64,11 @@ func (g *Gateway) setupRoutes() {
 
 	// Health check
 	g.mux.HandleFunc("/health", g.handleHealth)
+	
+	// Metrics endpoint (if metrics enabled)
+	if g.metrics != nil {
+		g.mux.Handle("/metrics", promhttp.Handler())
+	}
 
 	// 404 for unmatched routes
 	g.mux.HandleFunc("/", g.handleNotFound)
