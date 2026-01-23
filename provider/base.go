@@ -234,12 +234,9 @@ func (p *BaseProvider) sendStreamingRequest(ctx context.Context, url string, bod
 		// Read SSE line by line
 		decoder := NewSSEDecoder(resp.Body)
 		for {
-			// Check for context cancellation
-			select {
-			case <-ctx.Done():
+			// Check for context cancellation before reading
+			if ctx.Err() != nil {
 				return
-			default:
-				// Continue processing
 			}
 
 			line, err := decoder.NextLine()
