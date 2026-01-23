@@ -61,8 +61,23 @@ type ProviderConfig struct {
 	// HTTPClient is the HTTP client to use (optional)
 	HTTPClient *http.Client
 
-	// Timeout is the request timeout (optional)
+	// Timeout is the total request timeout (optional, default: 60s)
 	Timeout time.Duration
+
+	// ConnectTimeout is the connection timeout (optional, default: 10s)
+	ConnectTimeout time.Duration
+
+	// ReadTimeout is the read timeout (optional, default: 30s)
+	ReadTimeout time.Duration
+
+	// ConnectionPool settings
+	MaxIdleConns        int           // Maximum idle connections (default: 100)
+	MaxConnsPerHost     int           // Maximum connections per host (default: 10)
+	IdleConnTimeout     time.Duration // Idle connection timeout (default: 90s)
+	MaxIdleConnsPerHost int           // Maximum idle connections per host (default: 10)
+
+	// Retry configuration
+	RetryConfig *RetryConfig
 
 	// RequestConverter is an optional custom request converter
 	RequestConverter RequestConverterFunc
@@ -80,17 +95,31 @@ type ResponseConverterFunc func(*Response) error
 // DefaultConfig returns a default provider configuration
 func DefaultConfig() *ProviderConfig {
 	return &ProviderConfig{
-		SupportedAPIs: APITypeChatCompletions,
-		Timeout:       60 * time.Second,
+		SupportedAPIs:       APITypeChatCompletions,
+		Timeout:             60 * time.Second,
+		ConnectTimeout:      10 * time.Second,
+		ReadTimeout:         30 * time.Second,
+		MaxIdleConns:        100,
+		MaxConnsPerHost:     10,
+		IdleConnTimeout:     90 * time.Second,
+		MaxIdleConnsPerHost: 10,
+		RetryConfig:         DefaultRetryConfig(),
 	}
 }
 
 // NewProviderConfig creates a new provider configuration with the given name
 func NewProviderConfig(name string) *ProviderConfig {
 	return &ProviderConfig{
-		Name:          name,
-		SupportedAPIs: APITypeChatCompletions,
-		Timeout:       60 * time.Second,
+		Name:                name,
+		SupportedAPIs:       APITypeChatCompletions,
+		Timeout:             60 * time.Second,
+		ConnectTimeout:      10 * time.Second,
+		ReadTimeout:         30 * time.Second,
+		MaxIdleConns:        100,
+		MaxConnsPerHost:     10,
+		IdleConnTimeout:     90 * time.Second,
+		MaxIdleConnsPerHost: 10,
+		RetryConfig:         DefaultRetryConfig(),
 	}
 }
 
@@ -124,6 +153,33 @@ func (c *ProviderConfig) WithTimeout(timeout time.Duration) *ProviderConfig {
 	return c
 }
 
+// WithConnectTimeout sets the connection timeout
+func (c *ProviderConfig) WithConnectTimeout(timeout time.Duration) *ProviderConfig {
+	c.ConnectTimeout = timeout
+	return c
+}
+
+// WithReadTimeout sets the read timeout
+func (c *ProviderConfig) WithReadTimeout(timeout time.Duration) *ProviderConfig {
+	c.ReadTimeout = timeout
+	return c
+}
+
+// WithConnectionPool sets the connection pool parameters
+func (c *ProviderConfig) WithConnectionPool(maxIdleConns, maxConnsPerHost, maxIdleConnsPerHost int, idleConnTimeout time.Duration) *ProviderConfig {
+	c.MaxIdleConns = maxIdleConns
+	c.MaxConnsPerHost = maxConnsPerHost
+	c.MaxIdleConnsPerHost = maxIdleConnsPerHost
+	c.IdleConnTimeout = idleConnTimeout
+	return c
+}
+
+// WithRetryConfig sets the retry configuration
+func (c *ProviderConfig) WithRetryConfig(retryConfig *RetryConfig) *ProviderConfig {
+	c.RetryConfig = retryConfig
+	return c
+}
+
 // WithHTTPClient sets the HTTP client
 func (c *ProviderConfig) WithHTTPClient(client *http.Client) *ProviderConfig {
 	c.HTTPClient = client
@@ -147,7 +203,24 @@ func (c *ProviderConfig) GetHTTPClient() *http.Client {
 	if c.HTTPClient != nil {
 		return c.HTTPClient
 	}
+	
+	// Create custom transport with connection pool settings
+	transport := &http.Transport{
+		MaxIdleConns:        c.MaxIdleConns,
+		MaxConnsPerHost:     c.MaxConnsPerHost,
+		MaxIdleConnsPerHost: c.MaxIdleConnsPerHost,
+		IdleConnTimeout:     c.IdleConnTimeout,
+		DisableKeepAlives:   false,
+	}
+	
+	// Set timeouts if configured
+	if c.ConnectTimeout > 0 {
+		transport.DialContext = (&http.Transport{}).DialContext
+		transport.ResponseHeaderTimeout = c.ReadTimeout
+	}
+	
 	return &http.Client{
-		Timeout: c.Timeout,
+		Timeout:   c.Timeout,
+		Transport: transport,
 	}
 }

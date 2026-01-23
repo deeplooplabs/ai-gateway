@@ -100,7 +100,10 @@ func (h *LoggingHook) BeforeRequest(ctx context.Context, req *openai.ChatComplet
 }
 
 func (h *LoggingHook) AfterRequest(ctx context.Context, req *openai.ChatCompletionRequest, resp *openai.ChatCompletionResponse) error {
-	tenantID := ctx.Value("tenant_id").(string)
+	tenantID, ok := ctx.Value("tenant_id").(string)
+	if !ok {
+		tenantID = "unknown"
+	}
 	slog.InfoContext(ctx, "[Hook] AfterRequest", "request", jsonString(req), "response", jsonString(resp), "tenant_id", tenantID)
 	return nil
 }

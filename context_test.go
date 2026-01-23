@@ -24,7 +24,8 @@ func TestNewContext(t *testing.T) {
 }
 
 func TestContextSetGet(t *testing.T) {
-	ctx := NewContext(nil)
+	req, _ := http.NewRequest("POST", "/v1/test", nil)
+	ctx := NewContext(req)
 	ctx.Set("key", "value")
 
 	if val := ctx.Get("key"); val != "value" {

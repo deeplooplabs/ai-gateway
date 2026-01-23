@@ -45,6 +45,8 @@ func ExtractData(line []byte) string {
 	data := bytes.TrimPrefix(line, []byte("data:"))
 	// Trim leading spaces
 	data = bytes.TrimLeft(data, " ")
+	// Trim trailing newlines and carriage returns
+	data = bytes.TrimRight(data, "\r\n")
 	return string(data)
 }
 

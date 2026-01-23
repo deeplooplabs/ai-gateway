@@ -3,8 +3,10 @@ package gateway
 import (
 	"time"
 
+	"github.com/deeplooplabs/ai-gateway/cache"
 	"github.com/deeplooplabs/ai-gateway/hook"
 	"github.com/deeplooplabs/ai-gateway/model"
+	"github.com/deeplooplabs/ai-gateway/ratelimit"
 )
 
 // CORSConfig represents the CORS configuration
@@ -69,5 +71,26 @@ func WithHook(h hook.Hook) Option {
 func WithCORS(cors *CORSConfig) Option {
 	return func(g *Gateway) {
 		g.cors = cors
+	}
+}
+
+// WithMetrics enables Prometheus metrics collection
+func WithMetrics(namespace string) Option {
+	return func(g *Gateway) {
+		g.metrics = NewMetrics(namespace)
+	}
+}
+
+// WithCache enables response caching
+func WithCache(cacheImpl cache.Cache) Option {
+	return func(g *Gateway) {
+		g.cache = cacheImpl
+	}
+}
+
+// WithRateLimiter enables rate limiting
+func WithRateLimiter(limiter ratelimit.Limiter) Option {
+	return func(g *Gateway) {
+		g.rateLimiter = limiter
 	}
 }

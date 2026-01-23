@@ -1,6 +1,8 @@
 package model
 
 import (
+	"sync"
+
 	"github.com/deeplooplabs/ai-gateway/provider"
 )
 
@@ -21,6 +23,7 @@ type ModelRegistry interface {
 
 // MapModelRegistry is an in-memory model registry
 type MapModelRegistry struct {
+	mu     sync.RWMutex
 	models map[string]ProviderRewrite
 }
 
@@ -50,6 +53,8 @@ func WithPreferredAPI(apiType provider.APIType) RegisterOption {
 
 // Register registers a model with its provider
 func (r *MapModelRegistry) Register(model string, prov provider.Provider) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	r.models[model] = ProviderRewrite{
 		Provider:     prov,
 		ModelRewrite: "",
@@ -59,6 +64,8 @@ func (r *MapModelRegistry) Register(model string, prov provider.Provider) {
 
 // RegisterWithOptions registers a model with its provider and options
 func (r *MapModelRegistry) RegisterWithOptions(model string, prov provider.Provider, opts ...RegisterOption) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	pr := ProviderRewrite{
 		Provider:     prov,
 		ModelRewrite: "",
@@ -72,6 +79,8 @@ func (r *MapModelRegistry) RegisterWithOptions(model string, prov provider.Provi
 
 // Resolve returns the provider and model rewrite for a given model name
 func (r *MapModelRegistry) Resolve(model string) (provider.Provider, string) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
 	if pr, ok := r.models[model]; ok {
 		return pr.Provider, pr.ModelRewrite
 	}
@@ -80,6 +89,8 @@ func (r *MapModelRegistry) Resolve(model string) (provider.Provider, string) {
 
 // ResolveWithAPI returns the provider, model rewrite, and preferred API type for a given model name
 func (r *MapModelRegistry) ResolveWithAPI(model string) (provider.Provider, string, provider.APIType) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
 	if pr, ok := r.models[model]; ok {
 		apiType := pr.PreferredAPI
 		if apiType == 0 {
