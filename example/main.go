@@ -42,7 +42,9 @@ func main() {
 		model.WithModelRewrite("deepseek-ai/DeepSeek-V3.2"),
 		model.WithPreferredAPI(provider.APITypeChatCompletions),
 	)
-	registry.Register("gpt-3.5-turbo", openAIProvider)
+	registry.RegisterWithOptions("deepseek-ai/DeepSeek-V3.2", openAIProvider,
+		model.WithPreferredAPI(provider.APITypeChatCompletions),
+	)
 
 	// Example: Register SiliconFlow models with BasePath
 	// siliconFlowProvider := provider.NewHTTPProviderWithBaseURLAndPath(
@@ -77,6 +79,7 @@ func (h *AuthenticateHook) Name() string {
 }
 
 func (h *AuthenticateHook) Authenticate(ctx context.Context, apiKey string) (bool, string, error) {
+	slog.Info("Authenticate", "api_key", apiKey)
 	splits := strings.Split(apiKey, ":")
 	if len(splits) < 1 {
 		return false, "", nil
@@ -86,7 +89,7 @@ func (h *AuthenticateHook) Authenticate(ctx context.Context, apiKey string) (boo
 	if len(splits) == 2 {
 		teamId = splits[1]
 	}
-	return jwt != "" && teamId != "", teamId, nil
+	return jwt != "", teamId, nil
 }
 
 var _ hook.AuthenticationHook = new(AuthenticateHook)
