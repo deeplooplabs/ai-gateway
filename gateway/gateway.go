@@ -113,7 +113,7 @@ func (g *Gateway) isOriginAllowed(origin string) bool {
 		}
 	}
 
-	return origin == ""
+	return false
 }
 
 // handlePreflight handles OPTIONS preflight requests
