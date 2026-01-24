@@ -42,6 +42,17 @@ func main() {
 		model.WithModelRewrite("deepseek-ai/DeepSeek-V3.2"),
 		model.WithPreferredAPI(provider.APITypeChatCompletions),
 	)
+
+	registry.RegisterWithOptions("gpt-4o-mini", openAIProvider,
+		model.WithModelRewrite("deepseek-ai/DeepSeek-V3.2"),
+		model.WithPreferredAPI(provider.APITypeChatCompletions),
+	)
+
+	registry.RegisterWithOptions("gpt-3.5-turbo", openAIProvider,
+		model.WithModelRewrite("deepseek-ai/DeepSeek-V3.2"),
+		model.WithPreferredAPI(provider.APITypeChatCompletions),
+	)
+
 	registry.RegisterWithOptions("deepseek-ai/DeepSeek-V3.2", openAIProvider,
 		model.WithPreferredAPI(provider.APITypeChatCompletions),
 	)
