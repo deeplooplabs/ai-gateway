@@ -13,3 +13,4 @@ node_modules
 
 .venv
 .worktrees
+/.claude/settings.local.json
