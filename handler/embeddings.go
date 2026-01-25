@@ -99,6 +99,11 @@ func (h *EmbeddingsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Send request to provider
 	provResp, err := prov.SendRequest(ctx, provReq)
 	if err != nil {
+		slog.ErrorContext(ctx, "Provider request failed",
+			"error", err.Error(),
+			"provider", prov.Name(),
+			"model", req.Model,
+		)
 		h.writeError(w, r, NewProviderError("provider request failed", err))
 		return
 	}

@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 
 	"github.com/deeplooplabs/ai-gateway/provider/openai"
@@ -226,13 +227,27 @@ func (p *BaseProvider) sendEmbeddingRequest(ctx context.Context, url string, req
 		return nil, fmt.Errorf("marshal request: %w", err)
 	}
 
+	slog.InfoContext(ctx, "Sending embedding request to upstream",
+		"url", url,
+		"model", embeddingReq.Model,
+		"body", string(body),
+	)
+
 	respBody, err := p.sendHTTPNonStreaming(ctx, url, body, headers)
 	if err != nil {
+		slog.ErrorContext(ctx, "Upstream embedding request failed",
+			"url", url,
+			"error", err.Error(),
+		)
 		return nil, err
 	}
 
 	var embeddingResp openai.EmbeddingResponse
 	if err := json.Unmarshal(respBody, &embeddingResp); err != nil {
+		slog.ErrorContext(ctx, "Failed to decode embedding response",
+			"response", string(respBody),
+			"error", err.Error(),
+		)
 		return nil, fmt.Errorf("decode response: %w", err)
 	}
 
