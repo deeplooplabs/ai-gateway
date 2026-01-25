@@ -1,6 +1,8 @@
 package model
 
 import (
+	"fmt"
+	"log/slog"
 	"sync"
 
 	"github.com/deeplooplabs/ai-gateway/provider"
@@ -55,17 +57,26 @@ func WithPreferredAPI(apiType provider.APIType) RegisterOption {
 func (r *MapModelRegistry) Register(model string, prov provider.Provider) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	providerName := "unknown"
+	if prov != nil {
+		providerName = prov.Name()
+	}
 	r.models[model] = ProviderRewrite{
 		Provider:     prov,
 		ModelRewrite: "",
 		PreferredAPI: 0, // Auto-detect from provider
 	}
+	logModelRegistration(model, "", providerName, prov.SupportedAPIs())
 }
 
 // RegisterWithOptions registers a model with its provider and options
 func (r *MapModelRegistry) RegisterWithOptions(model string, prov provider.Provider, opts ...RegisterOption) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	providerName := "unknown"
+	if prov != nil {
+		providerName = prov.Name()
+	}
 	pr := ProviderRewrite{
 		Provider:     prov,
 		ModelRewrite: "",
@@ -75,6 +86,48 @@ func (r *MapModelRegistry) RegisterWithOptions(model string, prov provider.Provi
 		opt(&pr)
 	}
 	r.models[model] = pr
+	logModelRegistration(model, pr.ModelRewrite, providerName, pr.PreferredAPI)
+}
+
+// logModelRegistration logs the model registration with type information
+func logModelRegistration(model, modelRewrite, providerName string, apiType provider.APIType) {
+	apiTypeStr := formatAPIType(apiType)
+
+	msg := "Registered model"
+	attrs := []any{
+		"model", model,
+		"type", apiTypeStr,
+		"provider", providerName,
+	}
+
+	// Add model rewrite if present
+	if modelRewrite != "" {
+		attrs = append(attrs, "rewrite_to", modelRewrite)
+	}
+
+	slog.Info(msg, attrs...)
+}
+
+// formatAPIType formats the API type into a human-readable string
+func formatAPIType(apiType provider.APIType) string {
+	switch {
+	case apiType == 0:
+		return "auto"
+	case apiType.Supports(provider.APITypeChatCompletions) && apiType.Supports(provider.APITypeEmbeddings):
+		return "chat+embeddings"
+	case apiType.Supports(provider.APITypeChatCompletions) && apiType.Supports(provider.APITypeResponses):
+		return "chat+responses"
+	case apiType.Supports(provider.APITypeChatCompletions):
+		return "chat"
+	case apiType.Supports(provider.APITypeEmbeddings):
+		return "embedding"
+	case apiType.Supports(provider.APITypeImages):
+		return "image"
+	case apiType.Supports(provider.APITypeResponses):
+		return "response"
+	default:
+		return fmt.Sprintf("unknown(%d)", apiType)
+	}
 }
 
 // Resolve returns the provider and model rewrite for a given model name
