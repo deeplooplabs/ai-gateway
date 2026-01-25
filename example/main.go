@@ -64,6 +64,7 @@ func main() {
 	)
 	registry.RegisterWithOptions("text-embedding-3-large", openAIProvider,
 		model.WithPreferredAPI(provider.APITypeEmbeddings),
+		model.WithModelRewrite("Qwen/Qwen3-Embedding-8B"),
 	)
 
 	// Example: Register SiliconFlow models with BasePath
