@@ -67,6 +67,11 @@ func main() {
 		model.WithModelRewrite("Qwen/Qwen3-Embedding-8B"),
 	)
 
+	registry.RegisterWithOptions("text-embedding-ada-002", openAIProvider,
+		model.WithPreferredAPI(provider.APITypeEmbeddings),
+		model.WithModelRewrite("Qwen/Qwen3-Embedding-8B"),
+	)
+
 	// Example: Register SiliconFlow models with BasePath
 	// siliconFlowProvider := provider.NewHTTPProviderWithBaseURLAndPath(
 	// 	"https://api.siliconflow.cn/v1",
@@ -129,7 +134,7 @@ func (h *LoggingHook) AfterRequest(ctx context.Context, req *openai.ChatCompleti
 	if !ok {
 		tenantID = "unknown"
 	}
-	slog.InfoContext(ctx, "[Hook] AfterRequest", "request", jsonString(req), "response", jsonString(resp), "tenant_id", tenantID)
+	slog.InfoContext(ctx, "[Hook] AfterRequest", "response", jsonString(resp), "tenant_id", tenantID)
 	return nil
 }
 
