@@ -3,6 +3,7 @@ package handler
 import (
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
 
 	"github.com/deeplooplabs/ai-gateway/hook"
@@ -51,6 +52,13 @@ func (h *EmbeddingsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	ctx := r.Context()
 
+	// Log incoming request
+	slog.InfoContext(ctx, "Embeddings request received",
+		"model", req.Model,
+		"encoding_format", req.EncodingFormat,
+		"dimensions", req.Dimensions,
+	)
+
 	// Resolve provider
 	type resolver interface {
 		Resolve(model string) (provider.Provider, string)
@@ -71,8 +79,17 @@ func (h *EmbeddingsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// Apply model rewrite if specified
 	if modelRewrite != "" {
+		slog.InfoContext(ctx, "Model rewrite applied",
+			"original", req.Model,
+			"rewritten", modelRewrite,
+		)
 		req.Model = modelRewrite
 	}
+
+	slog.InfoContext(ctx, "Provider resolved",
+		"provider", prov.Name(),
+		"supported_apis", prov.SupportedAPIs().String(),
+	)
 
 	// Create provider request
 	provReq := provider.NewEmbeddingsRequest(req.Model, req.Input)
@@ -92,6 +109,12 @@ func (h *EmbeddingsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.writeError(w, r, NewProviderError("invalid response", err))
 		return
 	}
+
+	slog.InfoContext(ctx, "Embeddings response successful",
+		"embedding_count", len(resp.Data),
+		"model", resp.Model,
+		"prompt_tokens", resp.Usage.PromptTokens,
+	)
 
 	// Write response
 	w.Header().Set("Content-Type", "application/json")
