@@ -125,32 +125,33 @@ func (p *BaseProvider) ParseChatCompletionRequest(req *Request) (*openai.ChatCom
 	return req.ToChatCompletionRequest()
 }
 
+// ParseEmbeddingRequest parses the unified request as an Embedding request
+func (p *BaseProvider) ParseEmbeddingRequest(req *Request) (*openai.EmbeddingRequest, error) {
+	return req.ToEmbeddingRequest()
+}
+
+// ParseImageRequest parses the unified request as an Image request
+func (p *BaseProvider) ParseImageRequest(req *Request) (*openai.ImageRequest, error) {
+	return req.ToImageRequest()
+}
+
 // SendRequestToOpenAIProvider sends a request to an OpenAI-compatible provider
 // This is a helper method for providers that use the OpenAI API format
 func (p *BaseProvider) SendRequestToOpenAIProvider(ctx context.Context, req *Request) (*Response, error) {
-	// Convert to Chat Completions format if needed
-	if req.APIType != APITypeChatCompletions {
-		if err := p.ConvertRequestIfNeeded(req); err != nil {
-			return nil, fmt.Errorf("convert request: %w", err)
-		}
-	}
-
-	// Parse as Chat Completions request
-	chatReq, err := p.ParseChatCompletionRequest(req)
-	if err != nil {
-		return nil, fmt.Errorf("parse chat completion request: %w", err)
-	}
-
-	// Marshal request
-	body, err := json.Marshal(chatReq)
-	if err != nil {
-		return nil, fmt.Errorf("marshal request: %w", err)
-	}
-
 	// Build URL
 	endpoint := req.Endpoint
 	if endpoint == "" {
-		endpoint = "/v1/chat/completions"
+		// Default endpoint based on API type
+		switch req.APIType {
+		case APITypeEmbeddings:
+			endpoint = "/v1/embeddings"
+		case APITypeImages:
+			endpoint = "/v1/images/generations"
+		case APITypeResponses:
+			endpoint = "/v1/responses"
+		default:
+			endpoint = "/v1/chat/completions"
+		}
 	}
 
 	// Strip BasePath prefix from endpoint if configured
@@ -172,12 +173,95 @@ func (p *BaseProvider) SendRequestToOpenAIProvider(ctx context.Context, req *Req
 		headers = make(map[string]string)
 	}
 
+	// Handle different API types
+	switch req.APIType {
+	case APITypeEmbeddings:
+		return p.sendEmbeddingRequest(ctx, url, req, headers)
+	case APITypeImages:
+		return p.sendImageRequest(ctx, url, req, headers)
+	default:
+		// ChatCompletions and Responses use streaming support
+		return p.sendChatRequest(ctx, url, req, headers)
+	}
+}
+
+// sendChatRequest sends a chat completions or responses request
+func (p *BaseProvider) sendChatRequest(ctx context.Context, url string, req *Request, headers map[string]string) (*Response, error) {
+	// Convert to Chat Completions format if needed
+	if req.APIType != APITypeChatCompletions {
+		if err := p.ConvertRequestIfNeeded(req); err != nil {
+			return nil, fmt.Errorf("convert request: %w", err)
+		}
+	}
+
+	// Parse as Chat Completions request
+	chatReq, err := p.ParseChatCompletionRequest(req)
+	if err != nil {
+		return nil, fmt.Errorf("parse chat completion request: %w", err)
+	}
+
+	// Marshal request
+	body, err := json.Marshal(chatReq)
+	if err != nil {
+		return nil, fmt.Errorf("marshal request: %w", err)
+	}
+
 	// Handle streaming vs non-streaming
 	if req.Stream {
 		return p.sendStreamingRequest(ctx, url, body, headers, req.APIType)
 	}
 
 	return p.sendNonStreamingRequest(ctx, url, body, headers)
+}
+
+// sendEmbeddingRequest sends an embedding request
+func (p *BaseProvider) sendEmbeddingRequest(ctx context.Context, url string, req *Request, headers map[string]string) (*Response, error) {
+	embeddingReq, err := p.ParseEmbeddingRequest(req)
+	if err != nil {
+		return nil, fmt.Errorf("parse embedding request: %w", err)
+	}
+
+	body, err := json.Marshal(embeddingReq)
+	if err != nil {
+		return nil, fmt.Errorf("marshal request: %w", err)
+	}
+
+	respBody, err := p.sendHTTPNonStreaming(ctx, url, body, headers)
+	if err != nil {
+		return nil, err
+	}
+
+	var embeddingResp openai.EmbeddingResponse
+	if err := json.Unmarshal(respBody, &embeddingResp); err != nil {
+		return nil, fmt.Errorf("decode response: %w", err)
+	}
+
+	return NewEmbeddingResponse(&embeddingResp), nil
+}
+
+// sendImageRequest sends an image generation request
+func (p *BaseProvider) sendImageRequest(ctx context.Context, url string, req *Request, headers map[string]string) (*Response, error) {
+	imageReq, err := p.ParseImageRequest(req)
+	if err != nil {
+		return nil, fmt.Errorf("parse image request: %w", err)
+	}
+
+	body, err := json.Marshal(imageReq)
+	if err != nil {
+		return nil, fmt.Errorf("marshal request: %w", err)
+	}
+
+	respBody, err := p.sendHTTPNonStreaming(ctx, url, body, headers)
+	if err != nil {
+		return nil, err
+	}
+
+	var imageResp openai.ImageResponse
+	if err := json.Unmarshal(respBody, &imageResp); err != nil {
+		return nil, fmt.Errorf("decode response: %w", err)
+	}
+
+	return NewImageResponse(&imageResp), nil
 }
 
 // sendNonStreamingRequest sends a non-streaming request

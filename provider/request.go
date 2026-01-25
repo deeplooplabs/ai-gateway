@@ -8,9 +8,9 @@ import (
 	openresponses "github.com/deeplooplabs/ai-gateway/openresponses"
 )
 
-// Request is a unified request structure that supports both Chat Completions and Responses APIs
+// Request is a unified request structure that supports Chat Completions, Responses, Embeddings, and Images APIs
 type Request struct {
-	// APIType specifies which API format to use (ChatCompletions or Responses)
+	// APIType specifies which API format to use (ChatCompletions, Responses, Embeddings, or Images)
 	APIType APIType
 
 	// Stream indicates whether to use streaming
@@ -37,6 +37,34 @@ type Request struct {
 
 	// Truncation specifies how to handle context truncation (Responses API)
 	Truncation openresponses.TruncationEnum
+
+	// === Embeddings fields ===
+
+	// EmbeddingInput is the input text(s) to embed (string, []string, or [][]string)
+	EmbeddingInput any
+
+	// EncodingFormat is the embedding encoding format ("float" or "base64")
+	EncodingFormat string
+
+	// Dimensions is the embedding dimensions
+	Dimensions int
+
+	// === Images fields ===
+
+	// ImagePrompt is the prompt for image generation
+	ImagePrompt string
+
+	// ImageN is the number of images to generate
+	ImageN int
+
+	// ImageSize is the image size (e.g., "1024x1024")
+	ImageSize string
+
+	// ImageQuality is the image quality ("standard" or "hd")
+	ImageQuality string
+
+	// ImageStyle is the image style ("vivid" or "natural")
+	ImageStyle string
 
 	// === Common parameters (shared by both APIs) ===
 
@@ -91,6 +119,26 @@ func NewResponsesRequest(model string, input any) *Request {
 		Model:    model,
 		Input:    input,
 		Endpoint: "/v1/responses",
+	}
+}
+
+// NewEmbeddingsRequest creates a new request for Embeddings API
+func NewEmbeddingsRequest(model string, input any) *Request {
+	return &Request{
+		APIType:        APITypeEmbeddings,
+		Model:          model,
+		EmbeddingInput: input,
+		Endpoint:       "/v1/embeddings",
+	}
+}
+
+// NewImagesRequest creates a new request for Images API
+func NewImagesRequest(model, prompt string) *Request {
+	return &Request{
+		APIType:     APITypeImages,
+		Model:       model,
+		ImagePrompt: prompt,
+		Endpoint:    "/v1/images/generations",
 	}
 }
 
@@ -157,6 +205,30 @@ func (r *Request) ToResponsesRequest() (*openresponses.CreateRequest, error) {
 		req.Stream = &r.Stream
 	}
 
+	return req, nil
+}
+
+// ToEmbeddingRequest converts the unified request to OpenAI EmbeddingRequest
+func (r *Request) ToEmbeddingRequest() (*openai.EmbeddingRequest, error) {
+	req := &openai.EmbeddingRequest{
+		Input:          r.EmbeddingInput,
+		Model:          r.Model,
+		EncodingFormat: r.EncodingFormat,
+		Dimensions:     r.Dimensions,
+	}
+	return req, nil
+}
+
+// ToImageRequest converts the unified request to OpenAI ImageRequest
+func (r *Request) ToImageRequest() (*openai.ImageRequest, error) {
+	req := &openai.ImageRequest{
+		Model:   r.Model,
+		Prompt:  r.ImagePrompt,
+		N:       r.ImageN,
+		Size:    r.ImageSize,
+		Quality: r.ImageQuality,
+		Style:   r.ImageStyle,
+	}
 	return req, nil
 }
 

@@ -6,13 +6,14 @@ import (
 	"net/http"
 
 	"github.com/deeplooplabs/ai-gateway/hook"
+	"github.com/deeplooplabs/ai-gateway/provider"
 	"github.com/deeplooplabs/ai-gateway/provider/openai"
 )
 
 // ImagesHandler handles image generation requests
 type ImagesHandler struct {
 	// registry is typed as `any` to avoid circular dependencies.
-	// The handler only needs the Resolve(model string) (any, string) method,
+	// The handler only needs the Resolve(model string) (provider.Provider, string) method,
 	// which is checked via a local interface type assertion in ServeHTTP.
 	registry any
 	hooks    *hook.Registry
@@ -49,31 +50,50 @@ func (h *ImagesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		req.Model = "dall-e-3"
 	}
 
+	ctx := r.Context()
+
 	// Resolve provider
-	// In the test, we use a mock registry that returns the provider directly
 	type resolver interface {
-		Resolve(model string) (any, string)
+		Resolve(model string) (provider.Provider, string)
 	}
+	var prov provider.Provider
+	var modelRewrite string
+
 	if reg, ok := h.registry.(resolver); ok {
-		provider, modelRewrite := reg.Resolve(req.Model)
-		if provider == nil {
+		prov, modelRewrite = reg.Resolve(req.Model)
+		if prov == nil {
 			h.writeError(w, r, NewNotFoundError("model not found: "+req.Model))
 			return
 		}
-		// Apply model rewrite if specified
-		if modelRewrite != "" {
-			req.Model = modelRewrite
-		}
+	} else {
+		h.writeError(w, r, NewProviderError("registry not available", nil))
+		return
 	}
 
-	// TODO: This is a mock response for testing purposes.
-	// Once the Images provider interface is added, replace this with actual provider.SendRequest call.
-	// The provider interface should handle image generation requests and return real image data.
-	resp := &openai.ImageResponse{
-		Created: 1234567890,
-		Data: []openai.Image{{
-			B64JSON: "base64encodedimagedata",
-		}},
+	// Apply model rewrite if specified
+	if modelRewrite != "" {
+		req.Model = modelRewrite
+	}
+
+	// Create provider request
+	provReq := provider.NewImagesRequest(req.Model, req.Prompt)
+	provReq.ImageN = req.N
+	provReq.ImageSize = req.Size
+	provReq.ImageQuality = req.Quality
+	provReq.ImageStyle = req.Style
+
+	// Send request to provider
+	provResp, err := prov.SendRequest(ctx, provReq)
+	if err != nil {
+		h.writeError(w, r, NewProviderError("provider request failed", err))
+		return
+	}
+
+	// Get image response
+	resp, err := provResp.GetImage()
+	if err != nil {
+		h.writeError(w, r, NewProviderError("invalid response", err))
+		return
 	}
 
 	// Write response

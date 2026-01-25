@@ -57,6 +57,15 @@ func main() {
 		model.WithPreferredAPI(provider.APITypeChatCompletions),
 	)
 
+	// Register embedding models
+	registry.RegisterWithOptions("text-embedding-3-small", openAIProvider,
+		model.WithModelRewrite("Qwen/Qwen3-Embedding-4B"),
+		model.WithPreferredAPI(provider.APITypeEmbeddings),
+	)
+	registry.RegisterWithOptions("text-embedding-3-large", openAIProvider,
+		model.WithPreferredAPI(provider.APITypeEmbeddings),
+	)
+
 	// Example: Register SiliconFlow models with BasePath
 	// siliconFlowProvider := provider.NewHTTPProviderWithBaseURLAndPath(
 	// 	"https://api.siliconflow.cn/v1",
@@ -90,8 +99,9 @@ func (h *AuthenticateHook) Name() string {
 }
 
 func (h *AuthenticateHook) Authenticate(ctx context.Context, apiKey string) (bool, string, error) {
+	apiKey = strings.TrimPrefix(apiKey, "Bearer ")
 	slog.Info("Authenticate", "api_key", apiKey)
-	splits := strings.Split(apiKey, ":")
+	splits := strings.Split(apiKey, "+")
 	if len(splits) < 1 {
 		return false, "", nil
 	}

@@ -14,8 +14,12 @@ const (
 	APITypeChatCompletions APIType = 1 << iota
 	// APITypeResponses is OpenResponses API
 	APITypeResponses
-	// APITypeAll supports both APIs
-	APITypeAll = APITypeChatCompletions | APITypeResponses
+	// APITypeEmbeddings is OpenAI Embeddings API
+	APITypeEmbeddings
+	// APITypeImages is OpenAI Images API
+	APITypeImages
+	// APITypeAll supports all APIs
+	APITypeAll = APITypeChatCompletions | APITypeResponses | APITypeEmbeddings | APITypeImages
 )
 
 // String returns the string representation of APIType
@@ -25,6 +29,10 @@ func (a APIType) String() string {
 		return "chat_completions"
 	case APITypeResponses:
 		return "responses"
+	case APITypeEmbeddings:
+		return "embeddings"
+	case APITypeImages:
+		return "images"
 	case APITypeAll:
 		return "all"
 	default:

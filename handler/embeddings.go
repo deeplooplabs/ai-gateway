@@ -6,13 +6,14 @@ import (
 	"net/http"
 
 	"github.com/deeplooplabs/ai-gateway/hook"
+	"github.com/deeplooplabs/ai-gateway/provider"
 	"github.com/deeplooplabs/ai-gateway/provider/openai"
 )
 
 // EmbeddingsHandler handles embedding requests
 type EmbeddingsHandler struct {
 	// registry is typed as `any` to avoid circular dependencies.
-	// The handler only needs the Resolve(model string) (any, string) method,
+	// The handler only needs the Resolve(model string) (provider.Provider, string) method,
 	// which is checked via a local interface type assertion in ServeHTTP.
 	registry any
 	hooks    *hook.Registry
@@ -48,42 +49,49 @@ func (h *EmbeddingsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	ctx := r.Context()
+
 	// Resolve provider
-	// In the test, we use a mock registry that returns the provider directly
 	type resolver interface {
-		Resolve(model string) (any, string)
+		Resolve(model string) (provider.Provider, string)
 	}
+	var prov provider.Provider
+	var modelRewrite string
+
 	if reg, ok := h.registry.(resolver); ok {
-		provider, _ := reg.Resolve(req.Model)
-		if provider == nil {
+		prov, modelRewrite = reg.Resolve(req.Model)
+		if prov == nil {
 			h.writeError(w, r, NewNotFoundError("model not found: "+req.Model))
 			return
 		}
+	} else {
+		h.writeError(w, r, NewProviderError("registry not available", nil))
+		return
 	}
 
-	// Call BeforeRequest hooks
-	// Note: Current hook.RequestHook is typed for ChatCompletionRequest/Response
-	// For embeddings, hooks would need a new interface to be added later
-	// For now, we skip hook calls in embeddings handler
-
-	// For mock/testing, return mock response
-	// In real implementation, this would call provider.SendRequest
-	resp := &openai.EmbeddingResponse{
-		Object: "list",
-		Data: []openai.Embedding{{
-			Object:    "embedding",
-			Embedding: []float32{0.1, 0.2, 0.3},
-			Index:     0,
-		}},
-		Model: req.Model,
-		Usage: openai.Usage{
-			PromptTokens: 5,
-			TotalTokens:  5,
-		},
+	// Apply model rewrite if specified
+	if modelRewrite != "" {
+		req.Model = modelRewrite
 	}
 
-	// Call AfterRequest hooks
-	// Note: Skipped for now, same reason as BeforeRequest
+	// Create provider request
+	provReq := provider.NewEmbeddingsRequest(req.Model, req.Input)
+	provReq.EncodingFormat = req.EncodingFormat
+	provReq.Dimensions = req.Dimensions
+
+	// Send request to provider
+	provResp, err := prov.SendRequest(ctx, provReq)
+	if err != nil {
+		h.writeError(w, r, NewProviderError("provider request failed", err))
+		return
+	}
+
+	// Get embedding response
+	resp, err := provResp.GetEmbedding()
+	if err != nil {
+		h.writeError(w, r, NewProviderError("invalid response", err))
+		return
+	}
 
 	// Write response
 	w.Header().Set("Content-Type", "application/json")
@@ -103,8 +111,10 @@ func (h *EmbeddingsHandler) writeError(w http.ResponseWriter, r *http.Request, e
 
 	// Call ErrorHooks to notify of the error
 	ctx := r.Context()
-	for _, hh := range h.hooks.ErrorHooks() {
-		hh.OnError(ctx, err)
+	if h.hooks != nil {
+		for _, hh := range h.hooks.ErrorHooks() {
+			hh.OnError(ctx, err)
+		}
 	}
 
 	w.Header().Set("Content-Type", "application/json")

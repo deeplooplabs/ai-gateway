@@ -73,6 +73,12 @@ type Response struct {
 	// ORResponse is the OpenResponses response
 	ORResponse *openresponses.Response
 
+	// Embedding is the OpenAI Embeddings response
+	Embedding *openai.EmbeddingResponse
+
+	// Image is the OpenAI Images response
+	Image *openai.ImageResponse
+
 	// === Streaming responses (when Stream=true) ===
 
 	// Chunks is the channel for streaming chunks
@@ -100,6 +106,24 @@ func NewResponsesResponse(resp *openresponses.Response) *Response {
 		APIType:    APITypeResponses,
 		Stream:     false,
 		ORResponse: resp,
+	}
+}
+
+// NewEmbeddingResponse creates a new non-streaming Embedding response
+func NewEmbeddingResponse(resp *openai.EmbeddingResponse) *Response {
+	return &Response{
+		APIType:  APITypeEmbeddings,
+		Stream:   false,
+		Embedding: resp,
+	}
+}
+
+// NewImageResponse creates a new non-streaming Image response
+func NewImageResponse(resp *openai.ImageResponse) *Response {
+	return &Response{
+		APIType: APITypeImages,
+		Stream:  false,
+		Image:   resp,
 	}
 }
 
@@ -151,6 +175,22 @@ func (r *Response) GetORResponse(responseID string) (*openresponses.Response, er
 		return converter.ChatCompletionToResponse(r.ChatCompletion, responseID, nil), nil
 	}
 	return nil, fmt.Errorf("no response data available")
+}
+
+// GetEmbedding returns the Embeddings response
+func (r *Response) GetEmbedding() (*openai.EmbeddingResponse, error) {
+	if r.Embedding != nil {
+		return r.Embedding, nil
+	}
+	return nil, fmt.Errorf("no embedding response data available")
+}
+
+// GetImage returns the Image response
+func (r *Response) GetImage() (*openai.ImageResponse, error) {
+	if r.Image != nil {
+		return r.Image, nil
+	}
+	return nil, fmt.Errorf("no image response data available")
 }
 
 // IsStreaming returns true if this is a streaming response
