@@ -5,7 +5,7 @@ import (
 	"fmt"
 )
 
-// HTTPProvider is a configurable HTTP-based provider that supports both Chat Completions and Responses APIs
+// HTTPProvider is a configurable HTTP-based provider that supports Chat Completions, Embeddings, Images, and Responses APIs
 type HTTPProvider struct {
 	*BaseProvider
 }
@@ -25,12 +25,12 @@ func NewHTTPProvider(config *ProviderConfig) *HTTPProvider {
 }
 
 // NewHTTPProviderWithBaseURL creates a new HTTP provider with a base URL and API key
-// This is a convenience method that defaults to Chat Completions API
+// This is a convenience method that defaults to supporting all API types
 func NewHTTPProviderWithBaseURL(baseURL, apiKey string) *HTTPProvider {
 	config := NewProviderConfig("http").
 		WithBaseURL(baseURL).
 		WithAPIKey(apiKey).
-		WithAPIType(APITypeChatCompletions)
+		WithAPIType(APITypeAll)
 
 	return NewHTTPProvider(config)
 }
@@ -39,10 +39,22 @@ func NewHTTPProviderWithBaseURL(baseURL, apiKey string) *HTTPProvider {
 // The basePath is stripped from the endpoint before appending to base URL.
 // For example, with baseURL="https://api.siliconflow.cn/v1" and basePath="/v1",
 // the endpoint "/v1/chat/completions" becomes "https://api.siliconflow.cn/v1/chat/completions"
+// This method defaults to supporting all API types (chat, embeddings, images)
 func NewHTTPProviderWithBaseURLAndPath(baseURL, apiKey, basePath string) *HTTPProvider {
 	config := NewProviderConfig("http").
 		WithBaseURL(baseURL).
 		WithBasePath(basePath).
+		WithAPIKey(apiKey).
+		WithAPIType(APITypeAll)
+
+	return NewHTTPProvider(config)
+}
+
+// NewHTTPProviderChatOnly creates a new HTTP provider that only supports Chat Completions API
+// Use this when you want to explicitly restrict the provider to chat only
+func NewHTTPProviderChatOnly(baseURL, apiKey string) *HTTPProvider {
+	config := NewProviderConfig("http").
+		WithBaseURL(baseURL).
 		WithAPIKey(apiKey).
 		WithAPIType(APITypeChatCompletions)
 
