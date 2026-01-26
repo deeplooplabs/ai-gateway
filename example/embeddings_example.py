@@ -133,14 +133,13 @@ def main():
     print("LlamaIndex OpenAIEmbedding with AI Gateway Examples")
     print("=" * 60)
     print(f"\nGateway URL: {AI_GATEWAY_BASE_URL}")
-    print(f"API Base: {AI_GATEWAY_BASE_URL}")
 
     try:
         example_single_text()
-        example_multiple_texts()
-        example_with_dimensions()
-        example_query_vs_text()
-        example_with_large_batch()
+        # example_multiple_texts()
+        # example_with_dimensions()
+        # example_query_vs_text()
+        # example_with_large_batch()
 
         print("\n" + "=" * 60)
         print("All examples completed successfully!")

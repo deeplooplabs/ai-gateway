@@ -1,5 +1,11 @@
 package openai
 
+import (
+	"encoding/base64"
+	"encoding/json"
+	"math"
+)
+
 // Message represents a chat message
 type Message struct {
 	Role    string `json:"role"`
@@ -80,9 +86,46 @@ type EmbeddingResponse struct {
 
 // Embedding represents a single embedding vector
 type Embedding struct {
-	Object    string    `json:"object"`
-	Embedding []float32 `json:"embedding"`
-	Index     int       `json:"index"`
+	Object    string       `json:"object"`
+	Embedding EmbeddingVec `json:"embedding"`
+	Index     int          `json:"index"`
+}
+
+// EmbeddingVec is an embedding vector that can be represented as either
+// []float32 (float format) or a base64-encoded string (base64 format)
+type EmbeddingVec []float32
+
+// UnmarshalJSON implements json.Unmarshaler for EmbeddingVec
+// It handles both []float32 arrays and base64-encoded strings
+func (e *EmbeddingVec) UnmarshalJSON(data []byte) error {
+	// First, try to unmarshal as a float array
+	var floats []float32
+	if err := json.Unmarshal(data, &floats); err == nil {
+		*e = floats
+		return nil
+	}
+
+	// If that fails, try as a base64 string
+	var s string
+	if err := json.Unmarshal(data, &s); err != nil {
+		return err
+	}
+
+	// Decode base64 string
+	decoded, err := base64.StdEncoding.DecodeString(s)
+	if err != nil {
+		return err
+	}
+
+	// Convert bytes to float32 array (little-endian)
+	floats = make([]float32, len(decoded)/4)
+	for i := 0; i < len(floats); i++ {
+		// Read 4 bytes as a little-endian float32
+		bits := uint32(decoded[i*4]) | uint32(decoded[i*4+1])<<8 | uint32(decoded[i*4+2])<<16 | uint32(decoded[i*4+3])<<24
+		floats[i] = math.Float32frombits(bits)
+	}
+	*e = floats
+	return nil
 }
 
 // ImageRequest represents an image generation request

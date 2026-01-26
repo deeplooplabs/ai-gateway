@@ -215,6 +215,91 @@ func TestImageRequest_UnmarshalJSON(t *testing.T) {
 	}
 }
 
+func TestEmbeddingResponse_UnmarshalJSON_FloatFormat(t *testing.T) {
+	// Test float format (default OpenAI format)
+	body := `{
+		"object": "list",
+		"data": [
+			{
+				"object": "embedding",
+				"embedding": [0.1, -0.2, 0.3, -0.4],
+				"index": 0
+			}
+		],
+		"model": "text-embedding-3-small",
+		"usage": {
+			"prompt_tokens": 5,
+			"completion_tokens": 0,
+			"total_tokens": 5
+		}
+	}`
+
+	var resp EmbeddingResponse
+	if err := json.Unmarshal([]byte(body), &resp); err != nil {
+		t.Fatalf("failed to unmarshal float format: %v", err)
+	}
+
+	if len(resp.Data) != 1 {
+		t.Fatalf("expected 1 embedding, got %d", len(resp.Data))
+	}
+
+	embedding := resp.Data[0].Embedding
+	if len(embedding) != 4 {
+		t.Fatalf("expected embedding length 4, got %d", len(embedding))
+	}
+
+	// Check values
+	if embedding[0] != 0.1 {
+		t.Errorf("expected 0.1, got %f", embedding[0])
+	}
+	if embedding[1] != -0.2 {
+		t.Errorf("expected -0.2, got %f", embedding[1])
+	}
+}
+
+func TestEmbeddingResponse_UnmarshalJSON_Base64Format(t *testing.T) {
+	// Test base64 format (returned by providers when encoding_format=base64)
+	// This is a base64 encoding of [0.1, -0.2, 0.3, -0.4] as little-endian float32
+	body := `{
+		"object": "list",
+		"data": [
+			{
+				"object": "embedding",
+				"embedding": "zczMPc3MTL6amZk+zczMvg==",
+				"index": 0
+			}
+		],
+		"model": "text-embedding-3-small",
+		"usage": {
+			"prompt_tokens": 5,
+			"completion_tokens": 0,
+			"total_tokens": 5
+		}
+	}`
+
+	var resp EmbeddingResponse
+	if err := json.Unmarshal([]byte(body), &resp); err != nil {
+		t.Fatalf("failed to unmarshal base64 format: %v", err)
+	}
+
+	if len(resp.Data) != 1 {
+		t.Fatalf("expected 1 embedding, got %d", len(resp.Data))
+	}
+
+	embedding := resp.Data[0].Embedding
+	if len(embedding) != 4 {
+		t.Fatalf("expected embedding length 4, got %d", len(embedding))
+	}
+
+	// Check values (approximately due to floating point precision)
+	if embedding[0] < 0.099 || embedding[0] > 0.101 {
+		t.Errorf("expected ~0.1, got %f", embedding[0])
+	}
+	if embedding[1] > -0.199 || embedding[1] < -0.201 {
+		t.Errorf("expected ~-0.2, got %f", embedding[1])
+	}
+}
+
 func TestImageResponse_MarshalJSON(t *testing.T) {
 	resp := &ImageResponse{
 		Created: 1234567890,
