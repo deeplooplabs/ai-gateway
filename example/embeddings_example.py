@@ -8,7 +8,7 @@ Prerequisites:
     pip install llama-index-embeddings-openai
 
 Set environment variables:
-    export AI_GATEWAY_URL="http://localhost:8083"
+    export AI_GATEWAY_BASE_URL="http://localhost:8083"
     export AI_GATEWAY_API_KEY="your-api-key"
 """
 
@@ -16,12 +16,8 @@ import os
 from llama_index.embeddings.openai import OpenAIEmbedding
 
 # Configuration
-AI_GATEWAY_URL = os.getenv("AI_GATEWAY_URL", "http://localhost:8083")
+AI_GATEWAY_BASE_URL = os.getenv("AI_GATEWAY_BASE_URL", "http://localhost:8083/v1")
 AI_GATEWAY_API_KEY = os.getenv("AI_GATEWAY_API_KEY", "test-key")
-
-# The api_base should point to the gateway without the /v1 suffix
-# The gateway will handle the /v1/embeddings endpoint
-API_BASE = f"{AI_GATEWAY_URL}/v1"
 
 
 def example_single_text():
@@ -30,7 +26,7 @@ def example_single_text():
 
     embed_model = OpenAIEmbedding(
         model="text-embedding-3-small",
-        api_base=API_BASE,
+        api_base=AI_GATEWAY_BASE_URL,
         api_key=AI_GATEWAY_API_KEY,
     )
 
@@ -48,7 +44,7 @@ def example_multiple_texts():
 
     embed_model = OpenAIEmbedding(
         model="text-embedding-3-small",
-        api_base=API_BASE,
+        api_base=AI_GATEWAY_BASE_URL,
         api_key=AI_GATEWAY_API_KEY,
     )
 
@@ -72,7 +68,7 @@ def example_with_dimensions():
 
     embed_model = OpenAIEmbedding(
         model="text-embedding-3-small",
-        api_base=API_BASE,
+        api_base=AI_GATEWAY_BASE_URL,
         api_key=AI_GATEWAY_API_KEY,
         dimensions=512,  # Custom embedding dimension
     )
@@ -93,7 +89,7 @@ def example_query_vs_text():
     embed_model = OpenAIEmbedding(
         mode="text_search",
         model="text-embedding-3-small",
-        api_base=API_BASE,
+        api_base=AI_GATEWAY_BASE_URL,
         api_key=AI_GATEWAY_API_KEY,
     )
 
@@ -115,7 +111,7 @@ def example_with_large_batch():
 
     embed_model = OpenAIEmbedding(
         model="text-embedding-3-small",
-        api_base=API_BASE,
+        api_base=AI_GATEWAY_BASE_URL,
         api_key=AI_GATEWAY_API_KEY,
         embed_batch_size=10,  # Process 10 texts at a time
     )
@@ -136,8 +132,8 @@ def main():
     print("=" * 60)
     print("LlamaIndex OpenAIEmbedding with AI Gateway Examples")
     print("=" * 60)
-    print(f"\nGateway URL: {AI_GATEWAY_URL}")
-    print(f"API Base: {API_BASE}")
+    print(f"\nGateway URL: {AI_GATEWAY_BASE_URL}")
+    print(f"API Base: {AI_GATEWAY_BASE_URL}")
 
     try:
         example_single_text()
@@ -156,7 +152,7 @@ def main():
         print("1. Ensure AI Gateway is running:")
         print(f"   cd example && go run main.go")
         print("2. Check the gateway URL is correct:")
-        print(f"   Current: {AI_GATEWAY_URL}")
+        print(f"   Current: {AI_GATEWAY_BASE_URL}")
         print("3. Verify the model is registered in the gateway")
         print("4. Check gateway logs for detailed error messages")
 
