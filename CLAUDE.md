@@ -100,6 +100,11 @@ go test -run TestChatHandler -v ./handler/
 | `provider/openai/` | **OpenAI types** - canonical location for OpenAI API schemas. |
 | `hook/` | Extensible hook system with 4 hook types. |
 | `model/` | Model registry that maps model names to providers. |
+| `cache/` | LRU cache for response caching with TTL support. |
+| `ratelimit/` | Token bucket rate limiter for request throttling. |
+| `quota/` | Token usage quota tracking and enforcement. |
+| `loadbalancer/` | Multi-provider load balancing with health checks. |
+| `e2e/` | End-to-end tests using OpenAI client library. |
 
 ## OpenResponses Implementation
 
@@ -230,6 +235,9 @@ All OpenAI request/response types are defined in `provider/openai/types.go`. Thi
 | `/v1/embeddings` | `EmbeddingsHandler` | ✅ Full support |
 | `/v1/images/generations` | `ImagesHandler` | ✅ Full support |
 | `/v1/responses` | `ResponsesHandler` | ✅ Full support (OpenResponses) |
+| `/v1/models` | `ModelsHandler` | ✅ List available models |
+| `/health` | Built-in | ✅ Health check endpoint |
+| `/metrics` | Prometheus | ✅ Metrics (if enabled) |
 
 ## Conversion Between Formats
 
@@ -383,3 +391,227 @@ gw := gateway.New(
 ```
 
 All available options are in `gateway/option.go`.
+
+### Available Gateway Options
+
+| Option | Description |
+|--------|-------------|
+| `WithModelRegistry(registry)` | Set the model registry |
+| `WithHooks(hooks)` | Set the hook registry |
+| `WithHook(hook)` | Register a single hook |
+| `WithCORS(config)` | Enable CORS with configuration |
+| `WithMetrics(namespace)` | Enable Prometheus metrics |
+| `WithCache(cache)` | Enable response caching |
+| `WithRateLimiter(limiter)` | Enable rate limiting |
+
+## Advanced Features
+
+### Response Caching
+
+Cache LLM responses to reduce latency and costs:
+
+```go
+import "github.com/deeplooplabs/ai-gateway/cache"
+
+// Create LRU cache
+cacheImpl := cache.NewLRUCache(&cache.Config{
+    MaxSize:    100 * 1024 * 1024, // 100MB
+    MaxItems:   10000,
+    DefaultTTL: 5 * time.Minute,
+    Enabled:    true,
+})
+
+gw := gateway.New(
+    gateway.WithModelRegistry(registry),
+    gateway.WithCache(cacheImpl),
+)
+```
+
+**Cache Interface:**
+- `Get(ctx, key)` - Retrieve cached value
+- `Set(ctx, key, value, ttl)` - Store value with TTL
+- `Delete(ctx, key)` - Remove value
+- `Clear(ctx)` - Clear all values
+- `Stats()` - Get cache statistics (hits, misses, size, items)
+
+### Rate Limiting
+
+Throttle requests using token bucket algorithm:
+
+```go
+import "github.com/deeplooplabs/ai-gateway/ratelimit"
+
+// Create rate limiter
+limiter := ratelimit.NewTokenBucket(&ratelimit.Config{
+    RequestsPerSecond: 100, // 100 RPS
+    Burst:             200, // Allow bursts up to 200
+    Enabled:           true,
+})
+
+gw := gateway.New(
+    gateway.WithModelRegistry(registry),
+    gateway.WithRateLimiter(limiter),
+)
+```
+
+**Rate Limiter Interface:**
+- `Allow(ctx, key)` - Check if single request is allowed
+- `AllowN(ctx, key, n)` - Check if N requests are allowed
+- `Reset(ctx, key)` - Reset limiter for key
+
+### Quota Management
+
+Track and enforce token usage quotas per tenant:
+
+```go
+import "github.com/deeplooplabs/ai-gateway/quota"
+
+// Create quota manager
+quotaMgr := quota.NewManager(&quota.Config{
+    DefaultQuota: 1000000, // 1M tokens per tenant
+    ResetPeriod:  quota.Monthly,
+})
+
+// Set specific quota for a tenant
+quotaMgr.SetQuota(ctx, "tenant-123", 5000000)
+
+// Check quota before request
+allowed, usage, err := quotaMgr.CheckQuota(ctx, tenantID)
+
+// Record usage after request
+quotaMgr.RecordUsage(ctx, tenantID, inputTokens, outputTokens, totalTokens)
+```
+
+**Quota Manager Interface:**
+- `RecordUsage(ctx, tenantID, inputTokens, outputTokens, totalTokens)` - Record usage
+- `CheckQuota(ctx, tenantID)` - Check if tenant has remaining quota
+- `GetUsage(ctx, tenantID)` - Get current usage
+- `SetQuota(ctx, tenantID, limit)` - Set quota limit
+- `ResetUsage(ctx, tenantID)` - Reset usage for tenant
+- `ResetAll(ctx)` - Reset all tenant usage
+
+**Reset Periods:** `Hourly`, `Daily`, `Weekly`, `Monthly`, `Never`
+
+### Load Balancing
+
+Distribute requests across multiple providers:
+
+```go
+import "github.com/deeplooplabs/ai-gateway/loadbalancer"
+
+// Create load-balanced provider
+lb := loadbalancer.New("my-balanced-provider", loadbalancer.RoundRobin)
+lb.AddProvider(provider1, 1) // weight: 1
+lb.AddProvider(provider2, 2) // weight: 2 (gets 2x traffic)
+
+// Enable health checks
+lb.EnableHealthChecks(30 * time.Second)
+
+// Register in model registry
+registry.Register("gpt-4", lb)
+```
+
+**Load Balancing Strategies:**
+- `RoundRobin` - Evenly distribute across providers
+- `Random` - Random provider selection
+- `WeightedRandom` - Random selection weighted by provider weight
+- `LeastConnections` - Select provider with fewest active requests
+
+**Health Checks:**
+- Automatic health monitoring at configurable intervals
+- Unhealthy providers are automatically removed from rotation
+- Providers are re-added when they become healthy again
+
+### Metrics
+
+Expose Prometheus metrics for monitoring:
+
+```go
+gw := gateway.New(
+    gateway.WithModelRegistry(registry),
+    gateway.WithMetrics("ai_gateway"), // namespace prefix
+)
+
+// Metrics available at /metrics endpoint
+```
+
+**Exported Metrics:**
+- Request counts by endpoint, model, and status
+- Request duration histograms
+- Token usage by model
+- Cache hit/miss rates
+- Rate limiter rejections
+- Provider health status
+
+### CORS
+
+Enable Cross-Origin Resource Sharing:
+
+```go
+import "github.com/deeplooplabs/ai-gateway/gateway"
+
+cors := gateway.DefaultCORSConfig() // Allows all origins
+// Or customize:
+cors := &gateway.CORSConfig{
+    AllowedOrigins:   []string{"https://example.com"},
+    AllowedMethods:   []string{"GET", "POST"},
+    AllowedHeaders:   []string{"Content-Type", "Authorization"},
+    AllowCredentials: true,
+    MaxAge:           time.Hour,
+}
+
+gw := gateway.New(
+    gateway.WithModelRegistry(registry),
+    gateway.WithCORS(cors),
+)
+```
+
+## Testing
+
+### Running Tests
+
+```bash
+# Run all tests
+go test ./...
+
+# Run with race detection
+go test -race ./...
+
+# Run with coverage
+go test -cover ./...
+go test -coverprofile=coverage.out ./...
+go tool cover -html=coverage.out
+
+# Run E2E tests (uses OpenAI client)
+go test ./e2e/...
+
+# Skip E2E tests in short mode
+go test -short ./...
+```
+
+### E2E Test Structure
+
+E2E tests in `e2e/` use the real OpenAI client library (`github.com/sashabaranov/go-openai`) to test the gateway as a black box:
+
+```go
+// Setup test environment with mock provider
+env := NewTestEnvironment(t)
+
+// Configure mock response
+env.MockProvider.SetChatResponse(&openai.ChatCompletionResponse{...})
+
+// Use real OpenAI client pointing to test server
+client := env.Client
+resp, err := client.CreateChatCompletion(ctx, openai.ChatCompletionRequest{
+    Model: "gpt-4",
+    Messages: []openai.ChatCompletionMessage{...},
+})
+```
+
+**Test Categories:**
+- Chat completions (streaming and non-streaming)
+- OpenResponses API (streaming and non-streaming)
+- Embeddings
+- Images
+- Models endpoint
+- Error handling
