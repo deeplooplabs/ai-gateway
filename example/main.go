@@ -14,9 +14,17 @@ import (
 	"github.com/deeplooplabs/ai-gateway/model"
 	"github.com/deeplooplabs/ai-gateway/provider"
 	"github.com/deeplooplabs/ai-gateway/provider/openai"
+	"github.com/joho/godotenv"
 )
 
 func main() {
+	// Load .env file
+	if err := godotenv.Load(); err != nil {
+		slog.Info("No .env file found, using system environment variables")
+	} else {
+		slog.Info("Loaded .env file")
+	}
+
 	// Create providers using the new API
 
 	// Example 1: Standard provider (BaseURL doesn't include /v1)
