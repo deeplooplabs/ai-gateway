@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/deeplooplabs/ai-gateway/gateway"
 	"github.com/deeplooplabs/ai-gateway/hook"
@@ -28,10 +29,15 @@ func main() {
 	// Create providers using the new API
 
 	// Example 1: Standard provider (BaseURL doesn't include /v1)
-	openAIProvider := provider.NewHTTPProviderWithBaseURLAndPath(
-		os.Getenv("OPENAI_BASE_URL"),
-		os.Getenv("OPENAI_API_KEY"),
-		"/v1",
+	// Using full configuration to set longer timeouts for slow APIs
+	openAIProvider := provider.NewHTTPProvider(
+		provider.NewProviderConfig("http").
+			WithBaseURL(os.Getenv("OPENAI_BASE_URL")).
+			WithBasePath("/v1").
+			WithAPIKey(os.Getenv("OPENAI_API_KEY")).
+			WithAPIType(provider.APITypeAll).
+			WithTimeout(5*time.Minute).     // Total timeout
+			WithReadTimeout(3*time.Minute), // Read timeout for slow responses
 	)
 
 	// Example 2: Provider with BasePath (when BaseURL already includes /v1)
