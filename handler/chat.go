@@ -277,6 +277,10 @@ func NewProviderError(msg string, err error) *GatewayError {
 	return &GatewayError{Code: 502, Message: msg, Type: "api_error", Err: err}
 }
 
+func NewMethodNotAllowedError(msg string) *GatewayError {
+	return &GatewayError{Code: 405, Message: msg, Type: "invalid_request_error"}
+}
+
 func (e *GatewayError) Error() string {
 	if e.Err != nil {
 		return e.Message + ": " + e.Err.Error()

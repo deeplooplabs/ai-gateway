@@ -21,6 +21,8 @@ type ModelRegistry interface {
 	Resolve(model string) (provider.Provider, string)
 	// ResolveWithAPI returns the provider, model rewrite, and preferred API type
 	ResolveWithAPI(model string) (provider.Provider, string, provider.APIType)
+	// ListModels returns a list of all registered model names
+	ListModels() []string
 }
 
 // MapModelRegistry is an in-memory model registry
@@ -153,4 +155,16 @@ func (r *MapModelRegistry) ResolveWithAPI(model string) (provider.Provider, stri
 		return pr.Provider, pr.ModelRewrite, apiType
 	}
 	return nil, "", 0
+}
+
+// ListModels returns a list of all registered model names
+func (r *MapModelRegistry) ListModels() []string {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	models := make([]string, 0, len(r.models))
+	for model := range r.models {
+		models = append(models, model)
+	}
+	return models
 }

@@ -62,9 +62,13 @@ func (g *Gateway) setupRoutes() {
 	imagesHandler := handler.NewImagesHandler(g.modelRegistry, g.hooks)
 	g.mux.HandleFunc("/v1/images/generations", imagesHandler.ServeHTTP)
 
+	// Models
+	modelsHandler := handler.NewModelsHandler(g.modelRegistry)
+	g.mux.HandleFunc("/v1/models", modelsHandler.ServeHTTP)
+
 	// Health check
 	g.mux.HandleFunc("/health", g.handleHealth)
-	
+
 	// Metrics endpoint (if metrics enabled)
 	if g.metrics != nil {
 		g.mux.Handle("/metrics", promhttp.Handler())

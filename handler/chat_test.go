@@ -102,6 +102,10 @@ func (m *mapModelRegistry) ResolveWithAPI(model string) (provider.Provider, stri
 	return m.provider, "", provider.APITypeChatCompletions
 }
 
+func (m *mapModelRegistry) ListModels() []string {
+	return []string{"gpt-4", "gpt-3.5-turbo"}
+}
+
 type mockChatProvider struct{}
 
 func (m *mockChatProvider) Name() string {

@@ -282,3 +282,11 @@ type mockModelRegistry struct {
 func (m *mockModelRegistry) Resolve(model string) (openai2.Provider, string) {
 	return m.provider, ""
 }
+
+func (m *mockModelRegistry) ResolveWithAPI(model string) (openai2.Provider, string, openai2.APIType) {
+	return m.provider, "", openai2.APITypeEmbeddings
+}
+
+func (m *mockModelRegistry) ListModels() []string {
+	return []string{"text-embedding-3-small"}
+}
