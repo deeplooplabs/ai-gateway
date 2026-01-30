@@ -26,18 +26,20 @@ func main() {
 		slog.Info("Loaded .env file")
 	}
 
-	// Create providers using the new API
-
+	baseURL := os.Getenv("OPENAI_BASE_URL")
+	apiKey := os.Getenv("OPENAI_API_KEY")
+	llmModel := os.Getenv("LLM_MODEL")
+	slog.Info("Configuration", "OPENAI_BASE_URL", baseURL, "LLM_MODEL", llmModel)
 	// Example 1: Standard provider (BaseURL doesn't include /v1)
 	// Using full configuration to set longer timeouts for slow APIs
 	openAIProvider := provider.NewHTTPProvider(
 		provider.NewProviderConfig("http").
-			WithBaseURL(os.Getenv("OPENAI_BASE_URL")).
+			WithBaseURL(baseURL).
 			WithBasePath("/v1").
-			WithAPIKey(os.Getenv("OPENAI_API_KEY")).
+			WithAPIKey(apiKey).
 			WithAPIType(provider.APITypeAll).
-			WithTimeout(5*time.Minute).     // Total timeout
-			WithReadTimeout(3*time.Minute), // Read timeout for slow responses
+			WithTimeout(5 * time.Minute). // Total timeout
+			WithReadTimeout(3 * time.Minute), // Read timeout for slow responses
 	)
 
 	// Example 2: Provider with BasePath (when BaseURL already includes /v1)
@@ -53,21 +55,21 @@ func main() {
 	// Setup model registry with new API
 	registry := model.NewMapModelRegistry()
 	registry.RegisterWithOptions("gpt-4o", openAIProvider,
-		model.WithModelRewrite("deepseek-ai/DeepSeek-V3.2"),
+		model.WithModelRewrite(llmModel),
 		model.WithPreferredAPI(provider.APITypeChatCompletions),
 	)
 
 	registry.RegisterWithOptions("gpt-4o-mini", openAIProvider,
-		model.WithModelRewrite("deepseek-ai/DeepSeek-V3.2"),
+		model.WithModelRewrite(llmModel),
 		model.WithPreferredAPI(provider.APITypeChatCompletions),
 	)
 
 	registry.RegisterWithOptions("gpt-3.5-turbo", openAIProvider,
-		model.WithModelRewrite("deepseek-ai/DeepSeek-V3.2"),
+		model.WithModelRewrite(llmModel),
 		model.WithPreferredAPI(provider.APITypeChatCompletions),
 	)
 
-	registry.RegisterWithOptions("deepseek-ai/DeepSeek-V3.2", openAIProvider,
+	registry.RegisterWithOptions(llmModel, openAIProvider,
 		model.WithPreferredAPI(provider.APITypeChatCompletions),
 	)
 
