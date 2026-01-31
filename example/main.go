@@ -163,7 +163,7 @@ func (h *LoggingHook) AfterRequest(ctx context.Context, req *openai.ChatCompleti
 		index := choice.Index
 		msg := choice.Message
 		fmt.Println("====================================================================")
-		fmt.Println(index)
+		fmt.Println(fmt.Sprintf("- %d", index))
 		fmt.Println(strings.ToUpper(msg.Role + ":"))
 		fmt.Println(msg.Content)
 		fmt.Println("====================================================================")
