@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"log/slog"
 	"net/http"
@@ -142,6 +143,12 @@ type LoggingHook struct{}
 
 func (h *LoggingHook) BeforeRequest(ctx context.Context, req *openai.ChatCompletionRequest) error {
 	slog.InfoContext(ctx, "[Hook] BeforeRequest", "request", jsonString(req))
+	for _, msg := range req.Messages {
+		fmt.Println("====================================================================")
+		fmt.Println(strings.ToUpper(msg.Role + ":"))
+		fmt.Println(msg.Content)
+		fmt.Println("====================================================================")
+	}
 	return nil
 }
 
@@ -151,6 +158,17 @@ func (h *LoggingHook) AfterRequest(ctx context.Context, req *openai.ChatCompleti
 		tenantID = "unknown"
 	}
 	slog.InfoContext(ctx, "[Hook] AfterRequest", "response", jsonString(resp), "tenant_id", tenantID)
+
+	for _, choice := range resp.Choices {
+		index := choice.Index
+		msg := choice.Message
+		fmt.Println("====================================================================")
+		fmt.Println(index)
+		fmt.Println(strings.ToUpper(msg.Role + ":"))
+		fmt.Println(msg.Content)
+		fmt.Println("====================================================================")
+	}
+
 	return nil
 }
 
