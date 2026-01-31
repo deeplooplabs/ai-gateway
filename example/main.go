@@ -146,6 +146,7 @@ func (h *LoggingHook) BeforeRequest(ctx context.Context, req *openai.ChatComplet
 	for _, msg := range req.Messages {
 		fmt.Println("====================================================================")
 		fmt.Println(fmt.Sprintf("* %s ->", strings.ToUpper(msg.Role)))
+		fmt.Println("--------------------------------------------------------------------")
 		fmt.Println(msg.Content)
 		fmt.Println("====================================================================")
 	}
@@ -164,6 +165,7 @@ func (h *LoggingHook) AfterRequest(ctx context.Context, req *openai.ChatCompleti
 		msg := choice.Message
 		fmt.Println("====================================================================")
 		fmt.Println(fmt.Sprintf("* %d %s ->", index, strings.ToUpper(msg.Role)))
+		fmt.Println("--------------------------------------------------------------------")
 		fmt.Println(msg.Content)
 		fmt.Println("====================================================================")
 	}
