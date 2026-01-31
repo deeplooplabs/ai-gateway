@@ -143,13 +143,13 @@ type LoggingHook struct{}
 
 func (h *LoggingHook) BeforeRequest(ctx context.Context, req *openai.ChatCompletionRequest) error {
 	slog.InfoContext(ctx, "[Hook] BeforeRequest", "request", jsonString(req))
+	fmt.Println("====================================================================")
 	for _, msg := range req.Messages {
-		fmt.Println("====================================================================")
 		fmt.Println(fmt.Sprintf("* | %s >>", strings.ToUpper(msg.Role)))
 		fmt.Println("--------------------------------------------------------------------")
 		fmt.Println(msg.Content)
-		fmt.Println("====================================================================")
 	}
+	fmt.Println("====================================================================")
 	return nil
 }
 
@@ -160,15 +160,15 @@ func (h *LoggingHook) AfterRequest(ctx context.Context, req *openai.ChatCompleti
 	}
 	slog.InfoContext(ctx, "[Hook] AfterRequest", "response", jsonString(resp), "tenant_id", tenantID)
 
+	fmt.Println("====================================================================")
 	for _, choice := range resp.Choices {
 		index := choice.Index
 		msg := choice.Message
-		fmt.Println("====================================================================")
 		fmt.Println(fmt.Sprintf("%d | %s >>", index, strings.ToUpper(msg.Role)))
 		fmt.Println("--------------------------------------------------------------------")
 		fmt.Println(msg.Content)
-		fmt.Println("====================================================================")
 	}
+	fmt.Println("====================================================================")
 
 	return nil
 }
