@@ -38,8 +38,8 @@ func main() {
 			WithBasePath("/v1").
 			WithAPIKey(apiKey).
 			WithAPIType(provider.APITypeAll).
-			WithTimeout(5 * time.Minute). // Total timeout
-			WithReadTimeout(3 * time.Minute), // Read timeout for slow responses
+			WithTimeout(30 * time.Minute).     // Total timeout
+			WithReadTimeout(30 * time.Minute), // Read timeout for slow responses
 	)
 
 	// Example 2: Provider with BasePath (when BaseURL already includes /v1)
